@@ -8,9 +8,9 @@ The single source of truth. When a decision is made, it's recorded here. When an
 
 ## 1. Vision 🔒
 
-Wee Spurts is an online party game where the *fun is the friction*. It borrows Wii Sports' instantly-readable sports but swaps clean family competition for chaos: exaggerated physics, taunting, side-bets on each other's throws, and a comedic "drinking" gimmick. You play it in a Steam lobby with friends, laughing at each other, not at the game.
+Wee Spurts is an online party game where the *fun is the friction*. It borrows Wii Sports' instantly-readable sports but swaps clean family competition for chaos: exaggerated physics, taunting, side-bets on each other's throws, and a comedic "drinking" gimmick. You play it in a Steam lobby with friends, laughing at each other, not at the game. Think Lethal Company, Meccha Chameleon, Thief Simulator, etc.
 
-**One-line pitch:** Wii Sports if it egged you on to gamble on your friends and heckle their form.
+**One-line pitch:** Wii Sports if it you were able to throw a bowling ball at your friend as he's about to throw a strike, then you can go over to the bar, grab a beer and hit some slots in the corner. 
 
 > **Naming note:** "Wee Spurts" is the game. "Friendslop" is the trending *genre* it belongs to (party games built around chaos + friends), not the title.
 
@@ -18,15 +18,14 @@ Wee Spurts is an online party game where the *fun is the friction*. It borrows W
 
 Every feature must serve at least one. If it serves none, cut it.
 
-1. **Chaos over precision.** Physics should surprise and amuse, not reward mastery. A perfect throw and a terrible one should both be funny.
+1. **Chaos over precision.** Physics should surprise and amuse, not reward mastery. A perfect throw and a terrible one should both be funny. The games themselves should be fun and have replayability, not just getting bored in 30 seconds after you beat up your friend. 
 2. **The table talk is the game.** Features exist to create reasons to yell, bet, gloat, and heckle. Downtime between turns is a feature, not dead air.
 3. **Instantly readable.** A new player understands a minigame in 10 seconds. No manuals.
 4. **Friends first.** Designed for a private lobby of people who know each other, not anonymous matchmaking.
 
 ## 3. Tone & content guardrails 🔒
 
-- Gambling and drinking are **satirical and fake** — fake currency, cartoon exaggeration. No real money, no real-money-adjacent mechanics.
-- Keep it clearly comedic to stay on the right side of Steam's rules and age ratings. Revisit before store submission (see `OpenQuestions.md`).
+- While gambling and drinking are present, we don't want to have to rate ourselves on Steam due to adult content and get screwed over on sales. Keep it funny but somewhat clean if possible?
 
 ## 4. Tech Stack 🔒
 
