@@ -8,7 +8,7 @@ Deliberately undecided. Answering these on paper *before* the prototype would be
 - Voice chat in-game, or "just use Discord"?
 
 ## Characters — ANSWERED 2026-07-21 → moved to `ArtGuide.md` + `ContentPlan.md`
-- ~~Miis? Animals? Ragdoll humans? Potatoes?~~ → **Bean-people ragdolls.**
+- ~~Miis? Animals? Ragdoll humans? Potatoes?~~ → **Phasmo-style low-poly humanoids** (revised same day from beans; beans parked as fallback).
 - Customization v1: bean color + hats. Depth beyond that: still open, decide at Progression (Roadmap [7]).
 
 ## The alley as a place
