@@ -26,7 +26,7 @@ Systems survive; timelines drift. Build in dependency order. Each system is "don
 
 **[1] Core Framework** — Repo, Unity project in `/Unity`, Git+LFS, folder structure, `GameManager`, scene loader, an `AudioManager` stub. The skeleton everything hangs on.
 
-**[2] Steam Framework** — Facepunch initialized against App ID 480, Steam overlay confirmed, Mirror + FizzySteamworks installed, a bare "host creates lobby → friend joins via invite" flow with no gameplay yet. *De-risks the whole project — reach it early.*
+**[2] Steam Framework** — Facepunch initialized against App ID 480, Steam overlay confirmed, Mirror + FizzyFacepunch installed, a bare "host creates lobby → friend joins via invite" flow with no gameplay yet. *De-risks the whole project — reach it early.*
 
 **[3] Gameplay Framework** — Turn manager, player abstraction, score model, input handling. Game-agnostic scaffolding the bowling logic plugs into.
 

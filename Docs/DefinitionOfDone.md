@@ -11,7 +11,7 @@ A system is not "done" because code exists. It's done when it meets these criter
 
 ## [2] Steam Framework
 - [ ] Facepunch initializes with App ID 480; Steam overlay appears when running.
-- [ ] Mirror + FizzySteamworks installed and compiling.
+- [ ] Mirror + FizzyFacepunch installed and compiling.
 - [ ] Host can create a Steam lobby; a friend can join via Steam invite.
 - [ ] Player list reflects who's in the lobby; leaving updates it.
 - [ ] No gameplay required yet — just a reliable lobby.

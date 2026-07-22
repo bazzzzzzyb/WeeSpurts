@@ -1,7 +1,8 @@
 # Networking
 
 ## Decision 🔒
-- **Mirror** (high-level netcode framework) + **FizzySteamworks** (transport) routing traffic over **Steam Game Networking Sockets** (Valve's relay).
+- **Mirror** (high-level netcode framework) + **FizzyFacepunch** (transport) routing traffic over **Steam Game Networking Sockets** (Valve's relay).
+- *(Corrected 2026-07-21: originally said FizzySteamworks, which pairs with the Steamworks.NET wrapper. Since we use Facepunch.Steamworks for lobbies, the matching transport by the same author is FizzyFacepunch — mixing the two Steam wrappers causes DLL conflicts.)*
 - **Facepunch.Steamworks** for lobbies, friends list, invites, achievements.
 - Dev against **App ID 480 (Spacewar)**; swap to the real App ID at store-setup time.
 

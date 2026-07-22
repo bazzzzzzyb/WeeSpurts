@@ -33,7 +33,7 @@ Every feature must serve at least one. If it serves none, cut it.
 |---|---|
 | Engine | Unity (latest LTS) |
 | Language | C# |
-| Netcode | Mirror + FizzySteamworks (transport over Steam relay) |
+| Netcode | Mirror + FizzyFacepunch (transport over Steam relay) |
 | Steam API | Facepunch.Steamworks (lobbies, friends, invites, achievements) |
 | Dev App ID | 480 (Spacewar) until we buy Steam Direct |
 | Version control | GitHub + Git LFS |
@@ -76,3 +76,4 @@ This is the most important question and it CANNOT be answered on paper. The hone
 ## Change log
 - _(date)_ — Bible created, light/pre-prototype version.
 - 2026-07-21 — Repo restructured for Claude Code (`CLAUDE.md`, `.claude/` agents & commands). Chat-paste personas retired to `Docs/archive/`. `BLUEPRINT.md` added (market research, phases, gates). `Marketing.md` added. Walkable-alley hypothesis logged in §7 and `OpenQuestions.md`.
+- 2026-07-21 (later) — `PLAYBOOK.md` added: full AI/human task ledger. Phase 0+1 code written and staged in `_Staging/` (core framework, unit-tested scorer, ball/pins/input/camera, one-click greybox scene builder). Transport corrected: FizzySteamworks → **FizzyFacepunch** (must match Facepunch.Steamworks).

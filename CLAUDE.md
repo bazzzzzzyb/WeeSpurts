@@ -29,7 +29,7 @@ Online party game for Steam. Wii Sports readability + "friendslop" chaos: exagge
 
 ## Networking model (fixed — see Docs/Networking.md)
 
-Mirror + FizzySteamworks over Steam relay; Facepunch.Steamworks for lobbies/invites; dev App ID 480. **Host-authoritative.** Bowling syncs **launch parameters** (position, direction, power, spin, seed) — never per-frame physics. No client trusts another client. Handle join/leave/disconnect at every state.
+Mirror + FizzyFacepunch over Steam relay; Facepunch.Steamworks for lobbies/invites; dev App ID 480. **Host-authoritative.** Bowling syncs **launch parameters** (position, direction, power, spin, seed) — never per-frame physics. No client trusts another client. Handle join/leave/disconnect at every state.
 
 ## Git
 

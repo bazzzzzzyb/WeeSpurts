@@ -4,6 +4,7 @@ A chaotic online party game for Steam — Wii Sports energy with a friendslop tw
 
 ## Start here
 
+0. **`PLAYBOOK.md`** — the step-by-step build ledger: what AI does, what you do, in order. **This is the daily driver.**
 1. **`BLUEPRINT.md`** — the master plan: market research, direction, phases and gates, how to work.
 2. **`CLAUDE.md`** — auto-loaded by Claude Code; the rules of engagement.
 3. **`Docs/`** — the Game Bible and system docs. Docs are law: if code and Bible disagree, the Bible wins.
