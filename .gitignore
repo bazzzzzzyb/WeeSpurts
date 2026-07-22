@@ -1,0 +1,42 @@
+# --- Unity (applies inside /Unity) ---
+Unity/[Ll]ibrary/
+Unity/[Tt]emp/
+Unity/[Oo]bj/
+Unity/[Bb]uild/
+Unity/[Bb]uilds/
+Unity/[Ll]ogs/
+Unity/[Uu]ser[Ss]ettings/
+Unity/[Mm]emoryCaptures/
+Unity/[Rr]ecordings/
+Unity/Assets/AssetStoreTools*
+Unity/Assets/Plugins/Editor/JetBrains*
+Unity/*.pidb.meta
+Unity/*.pdb.meta
+Unity/*.mdb.meta
+Unity/sysinfo.txt
+Unity/crashlytics-build.properties
+
+# IDE
+.vs/
+.idea/
+.vscode/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+
+# Builds & packages
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# OS
+.DS_Store
+Thumbs.db

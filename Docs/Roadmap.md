@@ -1,5 +1,7 @@
 # Roadmap (systems, not weeks)
 
+> Phase-by-phase detail, effort guesses, and the gates between systems live in `BLUEPRINT.md` §6. This doc is the dependency graph.
+
 Systems survive; timelines drift. Build in dependency order. Each system is "done" only when it meets its criteria in `DefinitionOfDone.md`. No calendar dates — a system is finished when it's finished.
 
 ```
