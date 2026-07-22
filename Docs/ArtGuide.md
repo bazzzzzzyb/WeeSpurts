@@ -11,7 +11,7 @@
 - **Animation:** Mixamo for humanoid rigs; exaggerate for comedy.
 
 ## Characters 🔒 (decided 2026-07-21)
-**Bean-people ragdolls** — primitive-built capsule bodies, physics-driven (no rigs, no Mixamo), faces on a quad, hats for cosmetics. Full build spec in `ContentPlan.md` §2. The fun gate may still tune proportions/floppiness, but the direction is locked.
+**Phasmo-style low-poly humanoids** — normal-ish janky humans, bright-clean (never realistic-dark). Placeholder: Quaternius Universal Base Characters (CC0) + Mixamo animations; ragdoll comedy built from the rig; Tony's AI-made characters swap in later via the same humanoid slot. Pipeline: `ContentPlan.md` §2 + `AssetWorkbench.md`. (Bean-ragdoll spec parked as fallback.)
 
 ## Rules
 - Log every asset + license in `/Assets/README.md`.

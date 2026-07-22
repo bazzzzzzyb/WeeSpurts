@@ -2,7 +2,7 @@
 
 Assets, characters, animations, UI, audio, VFX: what we need, exactly where each comes from, who produces it (🤖 AI / 🧑 you), and when it enters the project. Companion to `ArtGuide.md` (style law) and `PLAYBOOK.md` (when).
 
-**Decided 2026-07-21 (Tony):** characters are **bean-people ragdolls**; the world is **bright Wii-clean**. Recorded in the Bible.
+**Decided 2026-07-21 (Tony, revised same day):** characters are **Phasmo-style low-poly humanoids** (normal-ish janky humans, bright-clean not realistic-dark); the world is **bright Wii-clean**. Placeholders = free CC0 rigged characters; Tony's AI-made models swap into the same slot later. Beans demoted to fallback. Recorded in the Bible. Tony's hands-on asset guide: `AssetWorkbench.md`.
 
 ---
 
@@ -22,23 +22,23 @@ Bright Wii-clean: daylight scenes, saturated flat colors, zero grime, chunky rea
 | Neutral light | `#F7F4EE` |
 | Neutral dark (outlines, text) | `#3A3A46` |
 
-Player bean colors: red, blue, green, yellow, purple, orange, pink, cyan — max saturation, instantly tell-apart (that's also the netcode-cheap "customization v1").
+Player colors: red, blue, green, yellow, purple, orange, pink, cyan — max saturation, instantly tell-apart (that's also the netcode-cheap "customization v1").
 
 Readability rules (from ArtGuide, now enforced): silhouette test on every model; no textures where a flat color works; if a screenshot doesn't read at phone-thumbnail size, it fails — that's the clip test again.
 
-## 2. Characters — the bean build 🤖 (this is code, not art)
+## 2. Characters — Phasmo-style humanoids 🧑🤖
 
-The genius of beans: **they need no modeling, no rigging, no Mixamo, no animations.** The body is Unity primitives; the comedy is physics. AI builds 100% of this.
+Direction: normal-ish low-poly humans doing dumb physics (the Lethal Company / R.E.P.O. / Phasmo lineage) rendered bright and clean to match our world. The jank is the charm; the realism stays out.
 
-Spec (the `/build-system` sessions in PLAYBOOK Stage G reference this):
+Pipeline (full hand-held steps in `AssetWorkbench.md` §2):
 
-- **Body**: capsule torso (~0.9m tall — short = cute = funny), sphere head fused on top, two small capsule arms on ConfigurableJoints, no legs — beans scoot/hop (cheaper, funnier, hides the hardest animation problem entirely).
-- **Locomotion**: physics hop — small impulse per step, torso kept upright by a spring torque ("active ragdoll lite"). Knocked/drunk states just lower the spring strength → instant floppy comedy. One tunable ScriptableObject: `BeanConfig` (hop force, upright spring, floppiness curve).
-- **Face**: one quad on the head with an expression texture — a small set (idle, effort, horror, gloat, drunk) swapped by game events. Faces are 90% of bean charm.
-  - 🤖 AI-generates the expression sheet (flat vector style) — any image generator per the Bible's tech table; you pick the winners.
-- **Customization v1**: bean color + hat. Hats = static CC0 props glued to a head anchor (see §3 sources). Later cosmetic loop (Roadmap [7]) just adds more hats.
-- **Ragdoll moment**: on big impacts, spring→0 for N seconds. This single number is a comedy dial.
-- **Builder tooling**: like `GreyboxSceneBuilder`, a `BeanBuilder` editor menu assembles the whole prefab — you never wire a joint by hand.
+- **Placeholder now**: Quaternius **Universal Base Characters** (CC0, rigged low-poly humans) — in the game in ~30 minutes.
+- **Animations**: Mixamo (free) retargets thousands of clips onto any humanoid rig — idle, walk, cheer, drunk stumble, taunt, fall. 🤖 Claude Code wires the Animator; 🧑 you shop for funny clips.
+- **Ragdoll comedy**: 🤖 built from the humanoid rig (joints per bone) — big hits flip animation → ragdoll. Works identically on every future character swap.
+- **Your models later**: any rigged humanoid (AI-generated then Mixamo auto-rigged, or downloaded) drops into the same slot, same animations, zero code changes.
+- **Customization v1**: material color tint + hats on a head bone anchor.
+
+**Fallback (parked):** the bean-ragdoll spec survives as plan B if humanoid ragdolls fight us for more than a week — beans need no rig at all (capsule body, physics hop, upright-spring floppiness dial, face on a quad). Cheap to prototype, proven genre-adjacent (PEAK), but Tony prefers humans — so beans only on evidence.
 
 ## 3. Asset shopping list (all free, log every one in `Assets/README.md`)
 
@@ -73,14 +73,14 @@ Spec (the `/build-system` sessions in PLAYBOOK Stage G reference this):
 
 ## 5. When content lands (maps to PLAYBOOK stages)
 
-The iron rule stands: **greybox until the fun gate** — with exactly two exceptions, because they ARE the gameplay: the bean characters (Stage C/G) and juice VFX/SFX (feel pass). Everything else waits.
+The iron rule stands: **greybox until the fun gate** — with exactly two exceptions, because they ARE the gameplay: the player characters (placeholder rigged humans, Stage C/G) and juice VFX/SFX (feel pass). Everything else waits.
 
-1. **Stage C (feel):** bean v1 spectates the lane (walkable-alley test), pin-crash SFX, hit particles. Game still greybox.
+1. **Stage C (feel):** placeholder character walks the alley (walkable-alley test), pin-crash SFX, hit particles. Game still greybox.
 2. **Stage F (UI):** Kenney UI Pack + Fredoka/Baloo 2 + palette = the real menus/HUD. UI is cheap to make good early because it's also your store screenshots' frame.
-3. **Stage G (slop):** faces, hats, taunt audio, coin/bet VFX.
-4. **Art pass (new stage, after "first funny game" gate, before store page):** replace greybox alley with Kenney/Poly Pizza dressing, skybox, lighting pass, bean color-picker in lobby. Budget: **two weeks max** — this style is deliberately cheap; polish goes into juice, not geometry.
+3. **Stage G (slop):** hats, taunt audio + emotes, coin/bet VFX.
+4. **Art pass (new stage, after "first funny game" gate, before store page):** replace greybox alley with Kenney/Poly Pizza dressing (and Tony's AI props), skybox, lighting pass, character color-picker in lobby. Budget: **two weeks max** — this style is deliberately cheap; polish goes into juice, not geometry.
 5. **Store page:** commissioned capsule; screenshots staged from the art-passed game.
 
 ## 6. What this plan deliberately excludes
 
-Mixamo and humanoid animation (beans made it unnecessary — biggest scope win in the project), custom 3D modeling, Blender (except emergency cleanup of AI filler props), realistic anything, and any paid asset. If a future feature seems to need one of these, that's a `/qa-review`-grade decision — surface it, don't drift into it.
+Custom rigging/weight-painting (Mixamo auto-rig does it), modeling characters from scratch (start from packs or AI gen), Blender beyond cleanup (until after the fun gate), realistic anything, and any paid asset. If a future feature seems to need one of these, that's a `/qa-review`-grade decision — surface it, don't drift into it.

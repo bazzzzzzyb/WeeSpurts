@@ -94,7 +94,8 @@ Follow `Docs/Marketing.md`. Summary of who does what: 🧑 pay $100 Steam Direct
 
 Everything visual/audible is planned in `Docs/ContentPlan.md` — exact packs, licenses, palette, pipelines. The short version of who does what:
 
-- 🤖 **Beans are code, not art.** `/build-system Characters: BeanBuilder editor tool + bean prefab per ContentPlan.md §2 — capsule body, physics hop, upright spring, ragdoll dial. No hand-wiring.` (Stage C/G. This replaces ALL character modeling, rigging, and Mixamo work — deliberately.)
+- 🧑🤖 **Characters**: download Quaternius Universal Base Characters + Mixamo clips (steps: `Docs/AssetWorkbench.md` §2), then `/build-system Characters: player character from the Quaternius rig — Humanoid import, Animator with the Mixamo clips, ragdoll from the rig with a comedy floppiness dial, PlayerCharacter prefab.` Your own AI-made humanoids swap in later, zero code changes.
+- 🧑 **Your parallel AI-art lane**: work `Docs/AssetWorkbench.md` §3 top-down (logo → UI icons → decals → signage → skybox). Never blocks code; placeholders ship.
 - 🤖 AI generates: face expression sheets, UI icons, VFX (particles), logo concepts; wires fonts, SFX, music.
 - 🧑 You: download the named CC0 packs (drag-and-drop steps in ContentPlan §4), record taunt lines with Braeden (funnier than AI voices), pick winners, log licenses in `Assets/README.md`.
 - 🗓️ Real art replaces greybox only at the **art pass** — a two-week-max stage AFTER the "first funny game" gate, before the store page. Until then: greybox + beans + juice. That's not a compromise; it's how every comp shipped.
