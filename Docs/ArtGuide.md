@@ -10,10 +10,10 @@
 - **3D (weak for AI):** buy/borrow low-poly packs first. Use text/image-to-3D (Meshy, Tripo, Rodin) only for one-off filler props, and expect cleanup in Blender.
 - **Animation:** Mixamo for humanoid rigs; exaggerate for comedy.
 
-## Characters ❓
-Undecided: Miis? animals? potatoes? ragdolls? Decided after prototype (`OpenQuestions.md`). Whatever it is, must have a clean low-poly silhouette and support ragdoll physics for chaos.
+## Characters 🔒 (decided 2026-07-21)
+**Bean-people ragdolls** — primitive-built capsule bodies, physics-driven (no rigs, no Mixamo), faces on a quad, hats for cosmetics. Full build spec in `ContentPlan.md` §2. The fun gate may still tune proportions/floppiness, but the direction is locked.
 
 ## Rules
 - Log every asset + license in `/Assets/README.md`.
-- Keep a consistent palette (define it here once chosen).
+- Palette is defined and LAW: see `ContentPlan.md` §1 (bright Wii-clean, decided 2026-07-21).
 - Silhouette test: if you can't tell what something is from its black outline, redesign it.
