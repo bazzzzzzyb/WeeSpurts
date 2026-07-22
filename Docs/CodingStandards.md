@@ -33,10 +33,11 @@ _Project/
 ```
 The `_Project/` prefix keeps your code separate from imported asset packs.
 
-## AI collaboration rules
-- **One system per session.** Never "build the game." Say: "In the Gameplay system, implement 10-frame scoring per `DefinitionOfDone.md`."
-- **Always paste the Bible + relevant doc first.** Context in, consistency out.
-- **Ask the AI to state assumptions before coding** if the task is ambiguous.
+## AI collaboration rules (Claude Code)
+- **One system per session.** Never "build the game." Use `/build-system <system: task>`, e.g. `/build-system Gameplay: 10-frame scoring per DefinitionOfDone.md`.
+- Context comes from `CLAUDE.md` + `Docs/` automatically — keep those files true and Claude stays consistent.
+- **Claude states assumptions and files-to-change before coding.** If it doesn't, ask for them.
+- **Run `/qa-review` after any networking, scoring, or coin change.**
 - **Never let AI invent APIs.** If it references a Mirror/Facepunch/Unity method, confirm it exists. Beginners can't always tell — when unsure, ask the AI to cite the official docs.
 - **Small diffs.** Prefer "add this one script" over "refactor everything."
 

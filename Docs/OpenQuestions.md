@@ -11,6 +11,10 @@ Deliberately undecided. Answering these on paper *before* the prototype would be
 - Miis? Animals? Ragdoll humans? Potatoes? Must be low-poly + ragdoll-friendly.
 - Customization depth: none / palette swap / full editor?
 
+## The alley as a place
+- Is the bowling alley a *walkable social space* (spectators wander, heckle up close, bar + slots in the corner, comedic interference) rather than a fixed-camera lane? `BLUEPRINT.md` Push 1 says test this in the first prototype — it may be the differentiator.
+- If yes: how much interference is funny vs. infuriating? (Cooldowns? Coin costs to interfere?)
+
 ## Physics feel
 - Realistic-ish, or full Gang Beasts / Human: Fall Flat floppiness? This defines the whole comedy tone — decide by *feeling* it in the prototype.
 

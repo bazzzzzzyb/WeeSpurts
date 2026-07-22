@@ -1,6 +1,6 @@
 # Wee Spurts — Game Bible
 
-The single source of truth. When a decision is made, it's recorded here. When an AI session starts, it reads here. If code and Bible disagree, the Bible wins (or the Bible gets updated on purpose).
+The single source of truth. When a decision is made, it's recorded here. Claude Code reads it automatically via `CLAUDE.md`. If code and Bible disagree, the Bible wins (or the Bible gets updated on purpose).
 
 **Status:** Light / pre-prototype. Sections marked 🔒 are decided. Sections marked ❓ are deliberately open until the bowling prototype teaches us the answer (see `OpenQuestions.md`).
 
@@ -69,7 +69,10 @@ See `CodingStandards.md`. Summary: the Unity project lives in `/Unity`; docs are
 
 This is the most important question and it CANNOT be answered on paper. The honest hypothesis: the differentiator is the "table talk" loop — betting on and heckling each other between turns — layered on chaotic physics. The prototype exists to prove or kill that hypothesis. Do not lock cosmetics, progression, or a marketing hook until a bowling game with the slop layer has actually made you and Braeden laugh. Tracked in `OpenQuestions.md`.
 
+> **Candidate answer (July 2026, from `BLUEPRINT.md` research):** make the alley a *walkable social space* — spectators physically present, heckling from the gutter, bar + slots in the corner, comedic interference with the active thrower. It unifies all three pillars, fixes turn-based downtime, and no comp owns it. Test it in the first prototype; promote to a pillar if it's as fun as it sounds.
+
 ---
 
 ## Change log
 - _(date)_ — Bible created, light/pre-prototype version.
+- 2026-07-21 — Repo restructured for Claude Code (`CLAUDE.md`, `.claude/` agents & commands). Chat-paste personas retired to `Docs/archive/`. `BLUEPRINT.md` added (market research, phases, gates). `Marketing.md` added. Walkable-alley hypothesis logged in §7 and `OpenQuestions.md`.
