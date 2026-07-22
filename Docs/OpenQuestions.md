@@ -7,9 +7,9 @@ Deliberately undecided. Answering these on paper *before* the prototype would be
 - Friends-only, invite-code, or public matchmaking? (Leaning friends-first.)
 - Voice chat in-game, or "just use Discord"?
 
-## Characters
-- Miis? Animals? Ragdoll humans? Potatoes? Must be low-poly + ragdoll-friendly.
-- Customization depth: none / palette swap / full editor?
+## Characters — ANSWERED 2026-07-21 → moved to `ArtGuide.md` + `ContentPlan.md`
+- ~~Miis? Animals? Ragdoll humans? Potatoes?~~ → **Bean-people ragdolls.**
+- Customization v1: bean color + hats. Depth beyond that: still open, decide at Progression (Roadmap [7]).
 
 ## The alley as a place
 - Is the bowling alley a *walkable social space* (spectators wander, heckle up close, bar + slots in the corner, comedic interference) rather than a fixed-camera lane? `BLUEPRINT.md` Push 1 says test this in the first prototype — it may be the differentiator.

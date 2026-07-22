@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rsync -a --exclude='.git' --exclude='.gitignore' --exclude='.gitattributes' --exclude='Library' --exclude='Logs' --exclude='UserSettings' ~/Documents/WeeSpurts/ Unity/)",
+      "Bash(mkdir -p Unity/Assets/_Project)",
+      "Bash(rsync -a _Staging/_Project/ Unity/Assets/_Project/)",
+      "Bash(rm -f Unity/Assets/_Project/.DS_Store)",
+      "Bash(rm -rf _Staging)",
+      "Bash(git status *)",
+      "Bash(git check-ignore *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(git rebase *)"
+    ]
+  }
+}
