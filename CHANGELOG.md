@@ -1,0 +1,24 @@
+# Changelog
+
+All notable changes to Wee Spurts. Newest at the top. Updated on request.
+
+## [Unreleased]
+
+### Design
+- **Throw mechanic locked** (`GameBible.md` §8; feel-knobs stay open in `OpenQuestions.md`). Miss-timing on the power meter = *grounded human-fumble chaos*: bad timing distorts direction/spin so the thrower visibly screws up (never supernatural or world-breaking), good timing stays clean and predictable (the competitive hook). Escalation is **non-linear** — small misses mild, big whiffs spectacular — with named failure archetypes (Hook / Chip / Overcook / Whiff) hand-placed at the meter extremes. Skill = consistency and style, not scoreboard domination (pin scatter + betting/heckle/drink layers keep it level). Refined from an earlier Sonnet draft of the same idea.
+
+### Added
+- **Sandbox aim-phase preview** — while aiming, the ball now visibly slides left/right with `CurrentLateral` (previously frozen and invisible until throw), and a short curved `LineRenderer` shows intended direction (`CurrentAngle`) with a spin-biased curve preview. New `AimPreview.cs`, wired onto the ball's GameObject by `GreyboxSceneBuilder`. Both the ball position and the line reuse `BowlingGameController.HalfLaneWidth` (new public property, factored out of `ResolveThrow` so preview and resolved throw can never drift apart) — purely visual, never touches `LaunchParameters` or the resolved throw. `DebugHud` now always shows Lateral/Angle/Power/Spin as numbers while aiming (previously only Power/Spin, and only while charging). Sandbox-only, safe to remove before shipping.
+- **Sandbox frame reset** — press `F` in Play mode to re-rack and replay the CURRENT frame (same player, same frame number) without ending the match. Added `BowlingScorer.ResetCurrentFrame()` (discards only the current frame's recorded rolls; earlier frames and `IsGameOver` untouched; no-op once the match is over) and a matching `BowlingGameController.ResetCurrentFrame()` that stops any in-flight throw coroutine and calls `BeginRoll()`. `DebugHud` hint updated. For repeated feel-testing of one throw setup without playing back through pin counting each time. Sandbox-only, safe to remove before shipping.
+- **Sandbox ball switcher** (`BallConfigSwitcher`) — press `1`–`9` in Play mode to pick which `BallConfig` the next throw uses, for A/B feel testing and powerup prototyping. Added `SetBallConfig()` / `ActiveBallConfig` to `BowlingGameController` (config is read per-throw, so swaps apply on the next roll). `DebugHud` shows the active ball; `GreyboxSceneBuilder` auto-adds the switcher and seeds slot 1 with the default ball. Sandbox-only, safe to remove before shipping.
+- **New `PinConfig` ScriptableObject** (`WeeSpurts/Pin Config` menu), same pattern as `BallConfig`/`LaneConfig`. Holds `PinSpacing`, `PinHeight`, `PinMass`, `KnockedAngleDegrees` (moved out of `LaneConfig`), plus new `Bounciness` and `Friction` tunables. `GreyboxSceneBuilder` now builds a `PinBounce` physics material from these, mirroring the ball's `BallBounce` material, so pin scatter feel is Inspector-tunable without touching code.
+- **`BouncyBall` and `Cannonball` `BallConfig` assets** — example ball-feel variants for the sandbox switcher (high-bounce vs. heavy/low-bounce), for A/B testing powerup feel.
+
+### Fixed
+- **Ball bounce material now uses `bounceCombine = Maximum`** (`GreyboxSceneBuilder`) so a ball's own `BallConfig.Bounciness` always wins over the lane floor's instead of averaging with it. Fixes bouncy-ball feel testing (ball was "slamming down" even at high `Bounciness`) and means future ball-feel powerup variants never need a matching floor material.
+- **Switching `BallConfig` mid-session now actually changes bounciness.** `BowlingBall.Launch()` previously left the ball's physic-material bounciness at whatever the *default* `BallConfig` had baked in at scene-build time — swapping to `BouncyBall` via the sandbox switcher changed mass/speed/spin but not bounce. `Launch()` now restamps an instanced copy of the collider's physic material (`collider.material`, not `sharedMaterial`) with the active config's `Bounciness` on every throw. Also: `GreyboxSceneBuilder` now auto-seeds the switcher with `BouncyBall`/`Cannonball` if those assets exist, so they're selectable without manually dragging them into the Inspector.
+
+### Changed
+- **`LaneConfig` is lane-geometry-only now** (`Length`, `Width`, `DebugPlayerCount`) — pin physics moved to the new `PinConfig`. `PinDeck.Initialize` now takes a `PinConfig` instead of a `LaneConfig`.
+- **Bowling ball now starts at chest height.** Added a `SpawnHeight` tunable to `BallConfig` (default `1.3` m) and pointed `GreyboxSceneBuilder`'s BallSpawn at it, so the ball drops onto the lane when thrown. Height is now editable in the Inspector without code.
+- **Aim camera reframed** for the higher ball: raised to Y `2.3`, pulled back to Z `-3.7`, pitched down to `16°` (`GreyboxSceneBuilder` aim view).
