@@ -12,7 +12,13 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(git fetch *)",
-      "Bash(git rebase *)"
+      "Bash(git rebase *)",
+      "Bash(chmod +x \"/Users/bazzy/Desktop/Wee Spurts Chat.command\")",
+      "Bash(brew upgrade *)",
+      "Bash(xargs -I{} sh -c 'echo ==={}===; cat {}')",
+      "Bash(python3 *)",
+      "Bash(xxd \"/Users/bazzy/WeeSpurts-1/Unity/Assets/TutorialInfo/Icons/URP.png\")",
+      "Bash(git commit *)"
     ]
   }
 }
