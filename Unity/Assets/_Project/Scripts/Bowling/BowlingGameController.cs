@@ -44,6 +44,30 @@ namespace WeeSpurts.Bowling
             pinDeck = deck; launcher = l; throwCamera = cam; ballSpawn = spawn;
         }
 
+        /// <summary>The ball config the NEXT throw will use. Read by the debug HUD.</summary>
+        public BallConfig ActiveBallConfig => ballConfig;
+
+        /// <summary>Where a fresh roll starts. Exposed for the sandbox aim preview.</summary>
+        public Transform BallSpawn => ballSpawn;
+
+        /// <summary>
+        /// Half the lane width available to the ball's CENTER, accounting for
+        /// its radius. The single source of truth for "how far can LateralPosition01
+        /// push the ball sideways" — ResolveThrow and the sandbox aim preview
+        /// both read this, so the preview always matches where the throw resolves.
+        /// </summary>
+        public float HalfLaneWidth => laneConfig.Width * 0.5f - ballConfig.Radius;
+
+        /// <summary>
+        /// Swap the active ball config at runtime. Because Launch() reads the
+        /// config per-throw, the change takes effect on the next roll — this is
+        /// the seam the sandbox switcher (and later, powerups) hooks into.
+        /// </summary>
+        public void SetBallConfig(BallConfig cfg)
+        {
+            if (cfg != null) ballConfig = cfg;
+        }
+
         private void Start()
         {
             Turns = new TurnManager();
@@ -64,6 +88,25 @@ namespace WeeSpurts.Bowling
             // every object comes back in a known-good state.
             if (MatchOver && Input.GetKeyDown(KeyCode.R))
                 SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+
+            // Sandbox: quick-reset just the CURRENT frame (re-rack, same
+            // player, same frame) without ending the match. For retrying one
+            // throw setup — e.g. bounce/spin feel-testing — without playing
+            // back through pin counting each time. Not available once the
+            // match is over; R already covers a full restart there.
+            if (!MatchOver && Input.GetKeyDown(KeyCode.F))
+                ResetCurrentFrame();
+        }
+
+        private void ResetCurrentFrame()
+        {
+            // Cancel any throw still resolving so it can't fight the reset;
+            // ball.ResetForThrow below independently clears its in-flight state.
+            StopAllCoroutines();
+
+            Turns.CurrentPlayer.Scorer.ResetCurrentFrame();
+            _ballSettled = false;
+            BeginRoll();
         }
 
         private void BeginRoll()
@@ -93,8 +136,7 @@ namespace WeeSpurts.Bowling
             Phase = $"{Turns.CurrentPlayer.DisplayName} — rolling… ({p})";
 
             // Place the ball at the chosen lateral spot, then hand physics the wheel.
-            float halfLane = laneConfig.Width * 0.5f - ballConfig.Radius;
-            Vector3 start = ballSpawn.position + Vector3.right * (p.LateralPosition01 * halfLane);
+            Vector3 start = ballSpawn.position + Vector3.right * (p.LateralPosition01 * HalfLaneWidth);
             ball.ResetForThrow(start);
 
             _ballSettled = false;

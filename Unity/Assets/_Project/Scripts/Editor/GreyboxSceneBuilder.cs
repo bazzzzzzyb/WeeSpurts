@@ -30,6 +30,7 @@ namespace WeeSpurts.Editor
             // ----- 1. Config assets (created once, then reused) -----
             BallConfig ballConfig = LoadOrCreateAsset<BallConfig>(ProjectRoot + "/ScriptableObjects/BallConfig.asset");
             LaneConfig laneConfig = LoadOrCreateAsset<LaneConfig>(ProjectRoot + "/ScriptableObjects/LaneConfig.asset");
+            PinConfig pinConfig = LoadOrCreateAsset<PinConfig>(ProjectRoot + "/ScriptableObjects/PinConfig.asset");
 
             // ----- 2. Fresh empty scene -----
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -73,19 +74,33 @@ namespace WeeSpurts.Editor
             pinGo.name = "PinTemplate";
             pinGo.transform.SetParent(deckGo.transform);
             // Cylinder mesh is 2 units tall at scale 1, so scale-y = height/2.
-            pinGo.transform.localScale = new Vector3(0.12f, laneConfig.PinHeight * 0.5f, 0.12f);
-            pinGo.transform.localPosition = new Vector3(0f, laneConfig.PinHeight * 0.5f, 0f);
+            pinGo.transform.localScale = new Vector3(0.12f, pinConfig.PinHeight * 0.5f, 0.12f);
+            pinGo.transform.localPosition = new Vector3(0f, pinConfig.PinHeight * 0.5f, 0f);
             pinGo.GetComponent<Renderer>().sharedMaterial = pinMat;
             // The default capsule collider has a ROUND bottom — pins would
             // wobble over on their own. A box collider stands firm and still
             // tips hilariously.
             Object.DestroyImmediate(pinGo.GetComponent<CapsuleCollider>());
-            pinGo.AddComponent<BoxCollider>();
+            BoxCollider pinCollider = pinGo.AddComponent<BoxCollider>();
             pinGo.AddComponent<Rigidbody>();
             Pin pinTemplate = pinGo.AddComponent<Pin>();
+
+            // Bounce + friction live on a physics material so scatter feel is
+            // tunable, same pattern as the ball's BallBounce material below.
+#if UNITY_6000_0_OR_NEWER
+            var pinBounce = new PhysicsMaterial("PinBounce");
+#else
+            var pinBounce = new PhysicMaterial("PinBounce");
+#endif
+            pinBounce.bounciness = pinConfig.Bounciness;
+            pinBounce.dynamicFriction = pinConfig.Friction;
+            pinBounce.staticFriction = pinConfig.Friction;
+            AssetDatabase.CreateAsset(pinBounce, ProjectRoot + "/ScriptableObjects/PinBounce.asset");
+            pinCollider.sharedMaterial = pinBounce;
+
             pinGo.SetActive(false);
 
-            deck.Initialize(laneConfig, pinTemplate);
+            deck.Initialize(pinConfig, pinTemplate);
             EditorUtility.SetDirty(deck);
 
             // ----- 7. Ball -----
@@ -100,17 +115,24 @@ namespace WeeSpurts.Editor
             // Bounciness lives on a physics material so the feel is tunable.
 #if UNITY_6000_0_OR_NEWER
             var bounce = new PhysicsMaterial("BallBounce");
+            bounce.bounceCombine = PhysicsMaterialCombine.Maximum;
 #else
             var bounce = new PhysicMaterial("BallBounce");
+            bounce.bounceCombine = PhysicMaterialCombine.Maximum;
 #endif
+            // Maximum combine: the ball's own Bounciness always wins over
+            // whatever the floor/pins are set to, so bouncy ball variants
+            // (power-ups) don't need a matching floor material to feel bouncy.
             bounce.bounciness = ballConfig.Bounciness;
             // ".asset" is the safe generic extension across Unity versions.
             AssetDatabase.CreateAsset(bounce, ProjectRoot + "/ScriptableObjects/BallBounce.asset");
             ballGo.GetComponent<SphereCollider>().sharedMaterial = bounce;
 
             // ----- 8. Ball spawn point -----
+            // Y comes from BallConfig.SpawnHeight so Tony can tune it without code.
+            // Default is chest height, so the ball drops onto the lane when thrown.
             GameObject spawn = new GameObject("BallSpawn");
-            spawn.transform.position = new Vector3(0f, ballConfig.Radius + 0.02f, 0f);
+            spawn.transform.position = new Vector3(0f, ballConfig.SpawnHeight, 0f);
             ballGo.transform.position = spawn.transform.position;
 
             // ----- 9. Camera -----
@@ -119,7 +141,9 @@ namespace WeeSpurts.Editor
             camGo.AddComponent<Camera>();
             camGo.AddComponent<AudioListener>();
             ThrowCamera throwCam = camGo.AddComponent<ThrowCamera>();
-            throwCam.ConfigureAimView(new Vector3(0f, 1.7f, -3.2f), new Vector3(12f, 0f, 0f), ballGo.transform);
+            // Raised + pulled back and pitched down a touch so the chest-height
+            // ball (BallConfig.SpawnHeight) stays framed with the lane visible ahead.
+            throwCam.ConfigureAimView(new Vector3(0f, 2.3f, -3.7f), new Vector3(16f, 0f, 0f), ballGo.transform);
             EditorUtility.SetDirty(throwCam);
 
             // ----- 10. Managers + game controller -----
@@ -132,8 +156,42 @@ namespace WeeSpurts.Editor
             BallLauncher launcher = gameGo.AddComponent<BallLauncher>();
             BowlingGameController controller = gameGo.AddComponent<BowlingGameController>();
             controller.Configure(ballConfig, laneConfig, ball, deck, launcher, throwCam, spawn.transform);
+
+            // Sandbox aim-phase preview: slides the ball to match live aim
+            // input and draws a curved LineRenderer for direction + spin.
+            // Purely visual (AimPreview.cs) — never touches LaunchParameters.
+            Material aimLineMat = LoadOrCreateMaterial("AimLineMat", new Color(1f, 0.9f, 0.1f));
+            // Prefer an unlit shader so the line reads as a flat, always-
+            // visible indicator color instead of shifting with scene
+            // lighting. Falls back to whatever LoadOrCreateMaterial already
+            // picked (Lit/Standard) if URP's Unlit shader isn't present.
+            Shader unlitShader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (unlitShader != null) aimLineMat.shader = unlitShader;
+            LineRenderer aimLine = ballGo.AddComponent<LineRenderer>();
+            aimLine.sharedMaterial = aimLineMat;
+            aimLine.startWidth = 0.03f;
+            aimLine.endWidth = 0.015f;
+            AimPreview aimPreview = ballGo.AddComponent<AimPreview>();
+            aimPreview.Configure(launcher, controller, aimLine);
+            EditorUtility.SetDirty(aimPreview);
+
+            // Sandbox ball switcher (press 1-9 in Play mode). Seed slot 1 with the
+            // default ball, then pick up any hand-tuned variant assets that already
+            // exist next to it (BouncyBall, Cannonball, ...) so they're selectable
+            // without manually dragging them into the Inspector list. We only load
+            // existing assets here, never create them — variants are Tony's to author.
+            BallConfigSwitcher switcher = gameGo.AddComponent<BallConfigSwitcher>();
+            switcher.EditorAddConfig(ballConfig);
+            foreach (string variantName in new[] { "BouncyBall", "Cannonball" })
+            {
+                var variant = AssetDatabase.LoadAssetAtPath<BallConfig>(
+                    ProjectRoot + "/ScriptableObjects/" + variantName + ".asset");
+                switcher.EditorAddConfig(variant);
+            }
+
             gameGo.AddComponent<DebugHud>();
             EditorUtility.SetDirty(controller);
+            EditorUtility.SetDirty(switcher);
 
             // ----- 11. Save scene + register in build settings -----
             EnsureFolder(ProjectRoot + "/Scenes");

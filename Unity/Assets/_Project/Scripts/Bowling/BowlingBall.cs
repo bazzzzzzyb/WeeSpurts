@@ -22,6 +22,7 @@ namespace WeeSpurts.Bowling
         public event Action OnSettled;
 
         private Rigidbody _rb;
+        private Collider _collider;
         private BallConfig _config;
         private bool _inFlight;
         private float _throwStartTime;
@@ -55,6 +56,7 @@ namespace WeeSpurts.Bowling
         private void Awake()
         {
             _rb = GetComponent<Rigidbody>();
+            _collider = GetComponent<Collider>();
             // Fast small object vs thin pins: continuous collision stops the
             // ball tunneling straight through a pin at high power.
             _rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
@@ -75,6 +77,14 @@ namespace WeeSpurts.Bowling
             _rb.isKinematic = false;
             _rb.mass = config.Mass;
             BallDrag = config.RollingDrag;
+            // ".material" (not "sharedMaterial") instantiates a per-ball copy the
+            // first time it's touched, so this can't leak bounciness changes back
+            // into the shared BallBounce.asset — each config swap just restamps
+            // that instance. Without this, switching BallConfig (e.g. the sandbox
+            // switcher's BouncyBall slot) changed mass/speed but not bounce, since
+            // GreyboxSceneBuilder only bakes bounciness onto the collider once,
+            // at scene-build time, from whatever config was default then.
+            _collider.material.bounciness = config.Bounciness;
 
             float speed = Mathf.Lerp(config.MinLaunchSpeed, config.MaxLaunchSpeed, Mathf.Clamp01(p.Power01));
             Quaternion aim = Quaternion.Euler(0f, p.AngleDegrees, 0f);

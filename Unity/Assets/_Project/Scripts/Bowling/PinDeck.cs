@@ -16,16 +16,16 @@ namespace WeeSpurts.Bowling
         [Tooltip("Disabled template pin that gets cloned 10 times.")]
         [SerializeField] private Pin pinTemplate;
 
-        [SerializeField] private LaneConfig laneConfig;
+        [SerializeField] private PinConfig pinConfig;
 
         private readonly List<Pin> _pins = new List<Pin>();
         // Pins that were standing before the current roll — the comparison
         // set that tells us what THIS roll knocked down.
         private readonly List<Pin> _standingBeforeRoll = new List<Pin>();
 
-        public void Initialize(LaneConfig config, Pin template)
+        public void Initialize(PinConfig config, Pin template)
         {
-            laneConfig = config;
+            pinConfig = config;
             pinTemplate = template;
         }
 
@@ -35,13 +35,13 @@ namespace WeeSpurts.Bowling
             // Lazy-create the 10 pins the first time.
             if (_pins.Count == 0)
             {
-                foreach (Vector3 offset in PinOffsets(laneConfig.PinSpacing))
+                foreach (Vector3 offset in PinOffsets(pinConfig.PinSpacing))
                 {
                     Pin pin = Instantiate(pinTemplate, transform);
                     pin.gameObject.SetActive(true);
                     Vector3 home = transform.position + offset;
                     pin.transform.position = home;
-                    pin.Configure(home, laneConfig.PinMass, laneConfig.KnockedAngleDegrees);
+                    pin.Configure(home, pinConfig.PinMass, pinConfig.KnockedAngleDegrees);
                     _pins.Add(pin);
                 }
             }
