@@ -89,7 +89,7 @@ namespace WeeSpurts.Gameplay
         {
             // The 10th frame is the weird one: strikes/spares earn bonus rolls,
             // and the rack resets whenever all 10 go down.
-            int firstRollOfTenth = _rolls[FirstRollIndexOfTenth()];
+            int firstRollOfTenth = _rolls[FirstRollIndexOfFrame(9)];
 
             if (RollInFrame == 0)
             {
@@ -117,15 +117,6 @@ namespace WeeSpurts.Gameplay
             // Third roll taken — always the end.
             IsGameOver = true;
             return RollOutcome.GameComplete;
-        }
-
-        private int FirstRollIndexOfTenth()
-        {
-            // Walk frames 1-9 to find where the 10th frame's rolls start.
-            int i = 0;
-            for (int f = 0; f < 9; f++)
-                i += (_rolls[i] == 10) ? 1 : 2;
-            return i;
         }
 
         /// <summary>
@@ -188,6 +179,36 @@ namespace WeeSpurts.Gameplay
             for (int f = 0; f < 10; f++)
                 if (totals[f].HasValue) best = totals[f].Value;
             return best;
+        }
+
+        /// <summary>
+        /// Sandbox/debug: discards any rolls recorded so far in the CURRENT
+        /// frame and re-racks it, without touching earlier frames' scores or
+        /// advancing the frame index. Lets Tony retry one throw setup
+        /// repeatedly instead of playing through pin counting every time.
+        /// No-op once the game is over — use a full rematch there instead.
+        /// </summary>
+        public void ResetCurrentFrame()
+        {
+            if (IsGameOver) return;
+
+            int firstRollIndex = FirstRollIndexOfFrame(CurrentFrame);
+            _rolls.RemoveRange(firstRollIndex, _rolls.Count - firstRollIndex);
+
+            RollInFrame = 0;
+            PinsStanding = 10;
+            NextRollNeedsFreshRack = true;
+        }
+
+        private int FirstRollIndexOfFrame(int frame)
+        {
+            // Walk the frames before it to find where its rolls start. Only
+            // valid for a frame that has actually been reached, since it
+            // assumes every earlier frame took its normal 1 (strike) or 2 rolls.
+            int i = 0;
+            for (int f = 0; f < frame; f++)
+                i += (_rolls[i] == 10) ? 1 : 2;
+            return i;
         }
     }
 }

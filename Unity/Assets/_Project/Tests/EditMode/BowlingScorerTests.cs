@@ -119,5 +119,92 @@ namespace WeeSpurts.Tests
             var s = Play(new int[20]);
             Assert.Throws<System.InvalidOperationException>(() => s.AddRoll(0));
         }
+
+        [Test]
+        public void ResetCurrentFrame_DiscardsMidFrameRoll_KeepsFrameIndex()
+        {
+            var s = new BowlingScorer();
+            s.AddRoll(7); // open first roll, 3 pins left standing
+
+            s.ResetCurrentFrame();
+
+            Assert.AreEqual(0, s.CurrentFrame);
+            Assert.AreEqual(0, s.RollInFrame);
+            Assert.AreEqual(10, s.PinsStanding);
+            Assert.IsTrue(s.NextRollNeedsFreshRack);
+            Assert.AreEqual(0, s.Rolls.Count);
+        }
+
+        [Test]
+        public void ResetCurrentFrame_LeavesEarlierFramesIntact()
+        {
+            var s = Play(9, 0); // frame 1 done, worth 9
+            s.AddRoll(7); // frame 2, first roll
+
+            s.ResetCurrentFrame();
+
+            Assert.AreEqual(1, s.CurrentFrame);
+            Assert.AreEqual(2, s.Rolls.Count); // frame 1's rolls untouched
+            Assert.AreEqual(9, s.GetTotal());
+        }
+
+        [Test]
+        public void ResetCurrentFrame_MidTenthFrameBonusRolls_ReRacks()
+        {
+            var s = Play(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // frames 1-9 gutters
+            s.AddRoll(10); // 10th: strike, earns bonus rolls
+
+            s.ResetCurrentFrame();
+
+            Assert.AreEqual(9, s.CurrentFrame);
+            Assert.AreEqual(0, s.RollInFrame);
+            Assert.AreEqual(10, s.PinsStanding);
+            Assert.IsFalse(s.IsGameOver);
+            Assert.AreEqual(18, s.Rolls.Count); // only frames 1-9's rolls remain
+        }
+
+        [Test]
+        public void ResetCurrentFrame_MidTenthFrameSpareBonus_ReRacks()
+        {
+            var s = Play(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // frames 1-9 gutters
+            s.AddRoll(4); // 10th: open first roll
+            s.AddRoll(6); // spare — earns a bonus roll
+
+            s.ResetCurrentFrame();
+
+            Assert.AreEqual(9, s.CurrentFrame);
+            Assert.AreEqual(0, s.RollInFrame);
+            Assert.AreEqual(10, s.PinsStanding);
+            Assert.IsFalse(s.IsGameOver);
+            Assert.AreEqual(18, s.Rolls.Count); // only frames 1-9's rolls remain
+        }
+
+        [Test]
+        public void ResetCurrentFrame_AfterDoubleBonusRoll_ReRacks()
+        {
+            var s = Play(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // frames 1-9 gutters
+            s.AddRoll(10); // 10th: strike
+            s.AddRoll(5); // first bonus roll (RollInFrame now 2, one more ball owed)
+
+            s.ResetCurrentFrame();
+
+            Assert.AreEqual(9, s.CurrentFrame);
+            Assert.AreEqual(0, s.RollInFrame);
+            Assert.AreEqual(10, s.PinsStanding);
+            Assert.IsFalse(s.IsGameOver);
+            Assert.AreEqual(18, s.Rolls.Count); // only frames 1-9's rolls remain
+        }
+
+        [Test]
+        public void ResetCurrentFrame_AfterGameOver_IsNoOp()
+        {
+            var s = Play(new int[20]);
+            int rollCountBefore = s.Rolls.Count;
+
+            s.ResetCurrentFrame();
+
+            Assert.IsTrue(s.IsGameOver);
+            Assert.AreEqual(rollCountBefore, s.Rolls.Count);
+        }
     }
 }

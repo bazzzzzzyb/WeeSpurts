@@ -15,8 +15,13 @@ namespace WeeSpurts.UI
     public class DebugHud : MonoBehaviour
     {
         private BowlingGameController _game;
+        private BallConfigSwitcher _switcher; // optional (sandbox only)
 
-        private void Awake() => _game = GetComponent<BowlingGameController>();
+        private void Awake()
+        {
+            _game = GetComponent<BowlingGameController>();
+            _switcher = GetComponent<BallConfigSwitcher>();
+        }
 
         private void OnGUI()
         {
@@ -27,19 +32,33 @@ namespace WeeSpurts.UI
 
             // ----- Controls hint -----
             GUI.Box(new Rect(10, 40, 620, 26),
-                "←/→ slide   Shift+←/→ angle   hold SPACE = power (release to throw)   Q/E = spin");
+                "←/→ slide   Shift+←/→ angle   hold SPACE = power (release to throw)   Q/E = spin   F = reset frame");
 
-            // ----- Power + spin meters, only while charging -----
+            // ----- Active ball (sandbox switcher) -----
+            if (_switcher != null)
+            {
+                string hint = _switcher.Count > 1 ? $"  (press 1–{Mathf.Min(_switcher.Count, 9)})" : "";
+                GUI.Box(new Rect(640, 10, 300, 26), $"BALL: {_switcher.ActiveName}{hint}");
+            }
+
+            // ----- Aim readouts (lateral/angle/power/spin), visible any time we're aiming -----
             BallLauncher l = _game.Launcher;
+            if (l != null && l.IsAiming)
+            {
+                string powerText = l.ChargingPower ? $"{(int)(l.CurrentPower * 100)}%" : "-";
+                GUI.Box(new Rect(10, 70, 620, 24),
+                    $"LATERAL {l.CurrentLateral:F2}   ANGLE {l.CurrentAngle:F1}°   POWER {powerText}   SPIN {l.CurrentSpin:F2}");
+            }
+
+            // ----- Power meter bar, only while actively charging -----
             if (l != null && l.IsAiming && l.ChargingPower)
             {
-                GUI.Box(new Rect(10, 70, 300, 22), $"POWER {(int)(l.CurrentPower * 100)}%");
-                GUI.Box(new Rect(12, 72, 296f * Mathf.Clamp01(l.CurrentPower), 18), GUIContent.none);
-                GUI.Box(new Rect(320, 70, 150, 22), $"SPIN {l.CurrentSpin:F2}");
+                GUI.Box(new Rect(10, 98, 300, 22), $"POWER {(int)(l.CurrentPower * 100)}%");
+                GUI.Box(new Rect(12, 100, 296f * Mathf.Clamp01(l.CurrentPower), 18), GUIContent.none);
             }
 
             // ----- Scorecards -----
-            float y = 102;
+            float y = 130;
             foreach (PlayerData p in _game.Turns.Players)
             {
                 int?[] totals = p.Scorer.GetFrameTotals();

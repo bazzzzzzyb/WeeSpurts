@@ -28,6 +28,11 @@ namespace WeeSpurts.Bowling
         [Tooltip("Sideways curve force applied while rolling, per unit of spin.")]
         public float SpinCurveForce = 6f;
 
+        [Tooltip("Height (meters) the ball starts at, measured to its center. " +
+                 "~1.3 = chest height, so the ball drops onto the lane when thrown. " +
+                 "Set to Radius + a hair (~0.13) to start it resting on the lane instead.")]
+        public float SpawnHeight = 1.3f;
+
         [Header("Feel")]
         [Tooltip("0 = dead ball, 1 = superball. Around 0.3 reads as 'heavy but lively'.")]
         [Range(0f, 1f)] public float Bounciness = 0.25f;
