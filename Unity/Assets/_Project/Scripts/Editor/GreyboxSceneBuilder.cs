@@ -135,6 +135,29 @@ namespace WeeSpurts.Editor
             spawn.transform.position = new Vector3(0f, ballConfig.SpawnHeight, 0f);
             ballGo.transform.position = spawn.transform.position;
 
+            // ----- 8b. Thrower proxy (Body English greybox) -----
+            // Stands behind and below the ball's spawn point, roughly at
+            // human height, at the foul line. No rig yet — a capsule reacts
+            // to throw timing until a Quaternius character implements the
+            // same IThrowReactionActor interface.
+            Material throwerMat = LoadOrCreateMaterial("ThrowerMat", new Color(0.9f, 0.75f, 0.55f));
+            // LoadOrCreateMaterial returns the ASSET AS-IS on every rebuild after
+            // the first (see its "if (existing != null) return existing;" early-out),
+            // so alpha/transparency can't be baked into the color argument above --
+            // it would only apply the one time the asset didn't exist yet. Force it
+            // unconditionally, every build, directly on the returned Material.
+            MakeTransparent(throwerMat, 0.35f);
+            GameObject throwerGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            throwerGo.name = "ThrowerProxy";
+            throwerGo.transform.position = spawn.transform.position + new Vector3(0f, -(ballConfig.SpawnHeight) + 1f, -0.8f);
+            throwerGo.GetComponent<Renderer>().sharedMaterial = throwerMat;
+            // Purely cosmetic (see CapsuleThrowReactionActor's doc comment) — it must
+            // never be a physical obstacle. Without this, the default CapsuleCollider
+            // that CreatePrimitive attaches sits ~0.8m behind the ball's spawn point
+            // and blocks any throw sent toward -Z, e.g. the backward-fumble gag.
+            Object.DestroyImmediate(throwerGo.GetComponent<CapsuleCollider>());
+            CapsuleThrowReactionActor throwReaction = throwerGo.AddComponent<CapsuleThrowReactionActor>();
+
             // ----- 9. Camera -----
             GameObject camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";
@@ -156,6 +179,7 @@ namespace WeeSpurts.Editor
             BallLauncher launcher = gameGo.AddComponent<BallLauncher>();
             BowlingGameController controller = gameGo.AddComponent<BowlingGameController>();
             controller.Configure(ballConfig, laneConfig, ball, deck, launcher, throwCam, spawn.transform);
+            controller.SetThrowReactionActor(throwReaction);
 
             // Sandbox aim-phase preview: slides the ball to match live aim
             // input and draws a curved LineRenderer for direction + spin.
@@ -189,11 +213,112 @@ namespace WeeSpurts.Editor
                 switcher.EditorAddConfig(variant);
             }
 
+            // Wobbler is a ball PERSONALITY (continuous weave), not a hand-tuned
+            // powerup like BouncyBall/Cannonball, so unlike those it doesn't exist
+            // yet — create it here if missing. Only stamp the Wobbler-specific
+            // tuning the FIRST time it's created, so re-running this builder after
+            // Tony hand-tunes it in the Inspector doesn't silently stomp his values.
+            string wobblerPath = ProjectRoot + "/ScriptableObjects/Wobbler.asset";
+            bool wobblerAlreadyExisted = AssetDatabase.LoadAssetAtPath<BallConfig>(wobblerPath) != null;
+            BallConfig wobblerConfig = LoadOrCreateAsset<BallConfig>(wobblerPath);
+            if (!wobblerAlreadyExisted)
+            {
+                wobblerConfig.WobbleForceMagnitude = 12f;
+                wobblerConfig.WobbleFrequencyHz = 0.5f;
+                EditorUtility.SetDirty(wobblerConfig);
+            }
+            switcher.EditorAddConfig(wobblerConfig);
+
+            // Nuke Shot (GameBible §9 powerup prototype): same create-if-missing
+            // pattern as Wobbler above — only stamp the Nuke-specific tuning the
+            // FIRST time it's created so a rebuild after Tony hand-tunes it
+            // doesn't stomp his values.
+            string nukePath = ProjectRoot + "/ScriptableObjects/Nuke.asset";
+            bool nukeAlreadyExisted = AssetDatabase.LoadAssetAtPath<BallConfig>(nukePath) != null;
+            BallConfig nukeConfig = LoadOrCreateAsset<BallConfig>(nukePath);
+            if (!nukeAlreadyExisted)
+            {
+                nukeConfig.IsNuke = true;
+                nukeConfig.NukeBlastRadius = 4f;
+                nukeConfig.NukeExplosionForce = 14f;
+                nukeConfig.NukeTweenDuration = 0.5f;
+                nukeConfig.NukeLockOnPauseDuration = 0.6f;
+                nukeConfig.NukeGreenZoneMin = 0.82f;
+                nukeConfig.NukeGreenZoneMax = 0.85f;
+                EditorUtility.SetDirty(nukeConfig);
+            }
+            switcher.EditorAddConfig(nukeConfig);
+
+            // ----- Nuke Shot presentation layer (greybox) -----
+            // Pure Transform-tweened visual, NOT a physics object — see
+            // NukeShotResolver's doc comment. Must NOT collide with the ball
+            // or pins, so its default SphereCollider is removed immediately
+            // (same lesson as ThrowerProxy above: GameObject.CreatePrimitive
+            // always attaches a default collider).
+            Material nukeMat = LoadOrCreateMaterial("NukeMat", new Color(1f, 0.2f, 0.05f));
+            GameObject nukeSphereGo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            nukeSphereGo.name = "NukeSphere";
+            nukeSphereGo.GetComponent<Renderer>().sharedMaterial = nukeMat;
+            Object.DestroyImmediate(nukeSphereGo.GetComponent<SphereCollider>());
+            nukeSphereGo.SetActive(false);
+
+            GameObject nukePoofGo = new GameObject("NukePoof");
+            ParticleSystem nukePoof = nukePoofGo.AddComponent<ParticleSystem>();
+            var nukePoofMain = nukePoof.main;
+            nukePoofMain.playOnAwake = false;
+            // A one-shot "poof", not a looping effect: AddComponent<ParticleSystem>()
+            // defaults to loop = true, so without this override the very first
+            // poofEffect.Play() (NukeShotResolver) would run forever. Duration/
+            // startLifetime just need to read as a quick puff for this greybox
+            // placeholder — not precisely tuned. stopAction = None (not Disable/
+            // Destroy) because this same GameObject/ParticleSystem is reused for
+            // every future nuke throw; None just means "do nothing extra when it
+            // naturally finishes," which is exactly what a reusable effect needs.
+            nukePoofMain.loop = false;
+            nukePoofMain.duration = 1f;
+            nukePoofMain.startLifetime = 1f;
+            nukePoofMain.stopAction = ParticleSystemStopAction.None;
+            nukePoof.Stop();
+
+            // AddComponent<ParticleSystem>() defaults its ParticleSystemRenderer to
+            // a Built-in-Render-Pipeline particle shader, which isn't part of URP's
+            // shader set — in this URP project (confirmed: com.unity.render-
+            // pipelines.universal in Packages/manifest.json) that renders as URP's
+            // solid-magenta missing-shader fallback, not an intentional pink VFX
+            // color. Explicitly assign a URP-compatible particle shader, same
+            // Find-then-fallback shape LoadOrCreateMaterial already uses for
+            // Lit/Standard below.
+            Material nukePoofMat = LoadOrCreateMaterial("NukePoofMat", new Color(1f, 0.6f, 0.1f));
+            Shader particleShader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+            if (particleShader == null) particleShader = Shader.Find("Particles/Standard Unlit");
+            if (particleShader != null) nukePoofMat.shader = particleShader;
+            nukePoofGo.GetComponent<ParticleSystemRenderer>().sharedMaterial = nukePoofMat;
+
+            GameObject nukeShotGo = new GameObject("NukeShot");
+            NukeShotResolver nukeResolver = nukeShotGo.AddComponent<NukeShotResolver>();
+            // NukeShotResolver's two references are deliberately PRIVATE
+            // [SerializeField] fields (minimal public surface), so wire them via
+            // SerializedObject rather than adding a public setter just for this.
+            // Both fields carry [SerializeField], so — unlike a plain public
+            // field assigned only in C# — this survives a scene reload; see the
+            // AimPreview lesson this file already learned once (CLAUDE.md/Bible).
+            var nukeResolverSO = new SerializedObject(nukeResolver);
+            nukeResolverSO.FindProperty("nukeSphere").objectReferenceValue = nukeSphereGo.transform;
+            nukeResolverSO.FindProperty("poofEffect").objectReferenceValue = nukePoof;
+            nukeResolverSO.ApplyModifiedPropertiesWithoutUndo();
+            controller.SetNukeResolver(nukeResolver);
+            EditorUtility.SetDirty(nukeResolver);
+
             gameGo.AddComponent<DebugHud>();
             EditorUtility.SetDirty(controller);
             EditorUtility.SetDirty(switcher);
 
             // ----- 11. Save scene + register in build settings -----
+            // EditorUtility.SetDirty() only flags objects dirty; it doesn't itself
+            // write to disk. Newly-created assets above (e.g. Wobbler.asset) are
+            // written by AssetDatabase.CreateAsset, but the SetDirty'd tuning
+            // values on them need an explicit SaveAssets to be guaranteed flushed.
+            AssetDatabase.SaveAssets();
             EnsureFolder(ProjectRoot + "/Scenes");
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -228,6 +353,60 @@ namespace WeeSpurts.Editor
             EnsureFolder(ProjectRoot + "/Materials");
             AssetDatabase.CreateAsset(mat, path);
             return mat;
+        }
+
+        /// <summary>
+        /// Forces a material into ghostly alpha-blended transparency, unconditionally,
+        /// every call -- unlike LoadOrCreateMaterial's color argument (which only ever
+        /// takes effect the one time the .mat asset is first created), this always
+        /// re-applies, so it also fixes a material that already exists on disk in a
+        /// half-configured or inconsistent state.
+        ///
+        /// Covers both possible shaders LoadOrCreateMaterial may have picked -- URP's
+        /// "Universal Render Pipeline/Lit" (or Unlit) and the Built-in Standard shader
+        /// -- since Set*/Enable/DisableKeyword calls for a property/keyword that
+        /// doesn't exist on the material's actual shader are documented no-ops, not
+        /// errors, so applying both is safe.
+        ///
+        /// Uses plain (non-premultiplied) alpha blending on both pipelines:
+        ///  - URP Lit/Unlit: Surface Type = Transparent (_Surface=1), Blend = Alpha
+        ///    (_Blend=0). NOTE: _ALPHAPREMULTIPLY_ON is URP's "Premultiply" blend mode
+        ///    (_Blend=1), not "Alpha" (_Blend=0) -- URP's own LitShader editor leaves
+        ///    it (and Multiply's _ALPHAMODULATE_ON) DISABLED for plain Alpha blend, so
+        ///    it's deliberately left off here despite being tempting to enable.
+        ///  - Built-in Standard: Rendering Mode = Fade (_Mode=2, _ALPHABLEND_ON), not
+        ///    "Transparent" (_Mode=3). Standard's _Mode=3 is a *premultiplied* mode
+        ///    that pairs with _ALPHAPREMULTIPLY_ON and SrcBlend=One, not SrcAlpha --
+        ///    Fade is the mode that actually matches the SrcAlpha/OneMinusSrcAlpha
+        ///    blend below (and Fade suits a plain greybox capsule fine; it has no
+        ///    specular highlight worth preserving the way Transparent mode would).
+        /// </summary>
+        private static void MakeTransparent(Material mat, float alpha)
+        {
+            Color c = mat.color;
+            c.a = alpha;
+            mat.color = c;
+
+            // ----- URP Lit/Unlit -----
+            mat.SetFloat("_Surface", 1f); // 0 = Opaque, 1 = Transparent
+            mat.SetFloat("_Blend", 0f);   // 0 = Alpha
+            mat.SetOverrideTag("RenderType", "Transparent");
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.DisableKeyword("_ALPHATEST_ON");
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON"); // that's Premultiply mode, not Alpha
+            mat.DisableKeyword("_ALPHAMODULATE_ON");    // that's Multiply mode, not Alpha
+
+            // ----- Built-in Standard -----
+            mat.SetFloat("_Mode", 2f); // 2 = Fade (matches SrcAlpha/OneMinusSrcAlpha below)
+            mat.DisableKeyword("_ALPHATEST_ON");
+            mat.EnableKeyword("_ALPHABLEND_ON");
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+
+            // ----- Shared blend state (both pipelines read these via the same names) -----
+            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetInt("_ZWrite", 0);
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
         }
 
         private static T LoadOrCreateAsset<T>(string path) where T : ScriptableObject

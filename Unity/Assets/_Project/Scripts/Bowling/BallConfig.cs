@@ -48,5 +48,62 @@ namespace WeeSpurts.Bowling
 
         [Tooltip("How long the ball must stay slow to count as settled (seconds).")]
         public float SettleDuration = 0.75f;
+
+        [Header("Feel — Timing Chaos (prototype)")]
+        [Tooltip("Maps |TimingError01| (0 = perfect timing, 1 = max possible miss) to a " +
+                 "0..1 chaos intensity. This is where 'worse is funnier — non-linearly' " +
+                 "(GameBible §8) actually lives: shape it flat near 0 (small misses barely " +
+                 "register) and steep near 1 (big misses go spectacular) so Tony can retune " +
+                 "the escalation curve in the Inspector without touching code.")]
+        public AnimationCurve TimingErrorCurve = new AnimationCurve(
+            new Keyframe(0f, 0f, 0f, 0f),
+            new Keyframe(1f, 1f, 2f, 2f));
+
+        [Tooltip("Max continuous sideways 'Hook' force (same units as SpinCurveForce) " +
+                 "applied while the ball rolls, at full chaos intensity. Direction comes " +
+                 "from the sign of TimingError01 (early vs. late release hook opposite ways).")]
+        public float HookForceMagnitude = 4f;
+
+        [Tooltip("Max one-time launch-angle offset (degrees) baked in at release, at full " +
+                 "chaos intensity. Represents the throw itself coming out slightly wrong.")]
+        public float ConeAngleJitterDegrees = 6f;
+
+        [Tooltip("Max one-time spin offset (same -1..1 scale as LaunchParameters.Spin) " +
+                 "baked in at release, at full chaos intensity.")]
+        public float ConeSpinJitterMagnitude = 0.3f;
+
+        [Header("Feel — Wobbler (prototype)")]
+        [Tooltip("Sideways force amplitude (same units as SpinCurveForce/HookForceMagnitude) for a continuous sinusoidal weave while rolling. 0 = no wobble — leave this at 0 for every ball EXCEPT Wobbler. Note: unlike Hook, this is a sinusoidal (not constant) force, so its effect on peak velocity scales as Magnitude / Frequency — lowering frequency grows the weave more than raising force alone.")]
+        public float WobbleForceMagnitude = 0f;
+
+        [Tooltip("Full side-to-side cycles per second while rolling. Higher = faster snake, lower = one long lazy weave — and a LOWER value makes the weave more visible (see WobbleForceMagnitude), not less.")]
+        public float WobbleFrequencyHz = 2f;
+
+        [Header("Feel — Nuke Shot (prototype)")]
+        [Tooltip("Marks this BallConfig as the Nuke Shot powerup. Every field below is ignored unless this is true.")]
+        public bool IsNuke = false;
+
+        [Tooltip("Radius (meters) of the pin-explosion blast. Nuke only. The 10-pin " +
+                 "triangle's farthest corner pin sits ~0.9m from the blast origin at " +
+                 "default PinSpacing (0.3) — this radius should stay comfortably above " +
+                 "that so falloff doesn't go to zero before reaching the back row.")]
+        public float NukeBlastRadius = 4f;
+
+        [Tooltip("Rigidbody.AddExplosionForce magnitude, applied via ForceMode.Impulse " +
+                 "(see Pin.ApplyExplosion) — this is a direct deltaV = force/PinMass at " +
+                 "the blast origin, NOT a continuous force, so don't confuse this scale " +
+                 "with a ForceMode.Force number. At default PinMass 1.4, 14 gives a peak " +
+                 "~10 m/s pop near the origin, falling off with distance/radius. Nuke only.")]
+        public float NukeExplosionForce = 14f;
+
+        [Tooltip("Seconds each tween (up, and separately down) takes. Nuke only.")]
+        public float NukeTweenDuration = 0.5f;
+
+        [Tooltip("Seconds the 'locking on' beacon pause holds between the up-tween and down-tween. Nuke only.")]
+        public float NukeLockOnPauseDuration = 0.6f;
+
+        [Tooltip("Green-zone power range (0..1) for a Nuke release specifically — may be tighter than the normal throw's default. Nuke only.")]
+        public float NukeGreenZoneMin = 0.82f;
+        public float NukeGreenZoneMax = 0.85f;
     }
 }

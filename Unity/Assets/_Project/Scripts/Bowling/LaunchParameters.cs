@@ -30,7 +30,24 @@ namespace WeeSpurts.Bowling
         /// </summary>
         public int Seed;
 
+        /// <summary>
+        /// How well-timed the release was against the power meter's green
+        /// zone: -1 = released late (held past the zone), 0 = perfect
+        /// (anywhere inside the zone), +1 = released early (before reaching
+        /// the zone). See BallLauncher.ComputeTimingError for the zone bounds.
+        /// </summary>
+        public float TimingError01;
+
+        /// <summary>
+        /// True when the release was such a total fumble (near-zero power — an
+        /// accidental tap) that the ball comically flies backward instead of
+        /// forward. A hand-placed gag archetype at the extreme low end of the
+        /// meter, deliberately NOT derived from TimingError01's smooth curve.
+        /// </summary>
+        public bool IsBackwardFumble;
+
         public override string ToString() =>
-            $"pos {LateralPosition01:F2}, angle {AngleDegrees:F1}°, power {Power01:P0}, spin {Spin:F2}, seed {Seed}";
+            $"pos {LateralPosition01:F2}, angle {AngleDegrees:F1}°, power {Power01:P0}, spin {Spin:F2}, seed {Seed}, timing {TimingError01:+0.00;-0.00;0.00}"
+            + (IsBackwardFumble ? ", BACKWARD FUMBLE" : "");
     }
 }

@@ -16,6 +16,14 @@ Unity/*.mdb.meta
 Unity/sysinfo.txt
 Unity/crashlytics-build.properties
 
+# --- Third-party asset packs kept OUT of git ---
+# Large Asset Store packs we're only trialling. Share via Drive, not the repo,
+# so we don't burn LFS quota or bloat history. Each dev imports them locally.
+# If a pack graduates to "we're actually shipping this", remove its line here
+# and commit it properly (LFS-tracked) — and tell the other dev.
+Unity/Assets/09RetroBowl/
+Unity/Assets/09RetroBowl.meta
+
 # IDE
 .vs/
 .idea/
@@ -40,3 +48,4 @@ Unity/crashlytics-build.properties
 # OS
 .DS_Store
 Thumbs.db
+.claude/settings.local.json

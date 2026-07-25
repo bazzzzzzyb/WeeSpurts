@@ -49,5 +49,25 @@ namespace WeeSpurts.Bowling
 
         /// <summary>Freeze physics (used while clearing dead wood between rolls).</summary>
         public void SetFrozen(bool frozen) => _rb.isKinematic = frozen;
+
+        /// <summary>
+        /// Powerup support (Nuke Shot): radial physics blast on this pin only.
+        /// ForceMode.Impulse is deliberate, not the AddExplosionForce default
+        /// (ForceMode.Force): Force is scaled for a force applied every
+        /// FixedUpdate tick, but this is a single one-shot call — with Force
+        /// mode a one-shot call only nets a velocity change of
+        /// (force/mass)*fixedDeltaTime, ~50x smaller than intended. Impulse
+        /// applies deltaV = force/mass directly, no timestep scaling, which is
+        /// the correct semantics for an instantaneous "hit this thing right
+        /// now" explosion. upwardsModifier gives every pin a bit of pop
+        /// (rather than a flat outward slide) and, as a side benefit, gives
+        /// the head pin — which sits exactly at the explosion origin, a
+        /// degenerate zero-distance case — a well-defined upward push instead
+        /// of an undefined/zero direction vector.
+        /// </summary>
+        public void ApplyExplosion(Vector3 origin, float radius, float force)
+        {
+            _rb.AddExplosionForce(force, origin, radius, upwardsModifier: 0.3f, mode: ForceMode.Impulse);
+        }
     }
 }

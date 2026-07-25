@@ -82,6 +82,21 @@ namespace WeeSpurts.Bowling
             return knocked;
         }
 
+        /// <summary>
+        /// Powerup support (Nuke Shot): radial explosion force on every currently
+        /// standing pin. Real Rigidbody physics — the SAME IsStanding/
+        /// CountKnockedThisRoll machinery a normal ball collision already uses
+        /// resolves the outcome afterward, so there's one pin-resolution path
+        /// regardless of how pins got hit. Pins ONLY — never call this on anything
+        /// else, and this method itself never touches the lane/rails.
+        /// </summary>
+        public void ApplyExplosion(Vector3 origin, float radius, float force)
+        {
+            foreach (Pin pin in _pins)
+                if (pin.gameObject.activeSelf)
+                    pin.ApplyExplosion(origin, radius, force);
+        }
+
         /// <summary>Classic 1-2-3-4 triangle, head pin at local origin, rows going +Z.</summary>
         public static IEnumerable<Vector3> PinOffsets(float spacing)
         {

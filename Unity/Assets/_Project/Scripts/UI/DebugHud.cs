@@ -54,6 +54,17 @@ namespace WeeSpurts.UI
             if (l != null && l.IsAiming && l.ChargingPower)
             {
                 GUI.Box(new Rect(10, 98, 300, 22), $"POWER {(int)(l.CurrentPower * 100)}%");
+
+                // Green target zone, drawn UNDER the fill so it "gets covered" as
+                // power climbs through it — the player watches the fill approach
+                // and pass through the target.
+                float zoneX = 12 + 296f * l.GreenZoneMin;
+                float zoneW = 296f * (l.GreenZoneMax - l.GreenZoneMin);
+                Color prevColor = GUI.color;
+                GUI.color = Color.green;
+                GUI.Box(new Rect(zoneX, 100, zoneW, 18), GUIContent.none);
+                GUI.color = prevColor;
+
                 GUI.Box(new Rect(12, 100, 296f * Mathf.Clamp01(l.CurrentPower), 18), GUIContent.none);
             }
 
