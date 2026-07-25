@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 namespace WeeSpurts.Bowling
@@ -17,33 +18,152 @@ namespace WeeSpurts.Bowling
         [SerializeField] private Vector3 aimViewEuler;
         [SerializeField] private Vector3 followOffset = new Vector3(0f, 1.6f, -2.5f);
         [SerializeField] private float followSmoothTime = 0.25f;
+        // Slower than followSmoothTime on purpose: the Nuke Shot's rising-sphere
+        // chase (FollowRising) should read as a distinct, more deliberate camera
+        // move than the fast normal ball-chase (FollowBall), not identical to it.
+        [SerializeField] private float nukeRiseFollowSmoothTime = 0.6f;
 
         private bool _following;
+        // True while a hard-cut static framing (CutToBehindAbove) should persist
+        // as-is instead of being reset to aimViewPosition every frame — see the
+        // LateUpdate else-branch below.
+        private bool _staticHold;
+        // Which SmoothDamp smooth time the follow branch in LateUpdate should use
+        // this frame. Set by whichever follow-starting method (FollowBall /
+        // FollowRising) was called last, so each can pick its own pace without
+        // duplicating the LateUpdate follow branch.
+        private float _activeFollowSmoothTime;
+        // The real ball, cached once at scene-build time via ConfigureAimView.
+        // FollowRising temporarily repoints followTarget at the Nuke sphere;
+        // FollowBall uses this to hand followTarget back to the real ball
+        // afterwards instead of leaking the sphere as a permanent follow target.
+        private Transform _ballTarget;
         private Vector3 _velocity;
+        private Vector3 _shakeOffset;
+        private Coroutine _shakeRoutine;
+        // The camera's position with shake NOT yet applied. Tracked separately
+        // from transform.position so shake can be added fresh each frame
+        // instead of accumulating into the value SmoothDamp/the static aim
+        // view read back next frame (which would make the camera drift away
+        // permanently instead of returning to anchor once a shake decays —
+        // this matters for e.g. the Nuke Shot, whose Shake() calls happen
+        // while the camera is still in the STATIC aim view, not following).
+        private Vector3 _basePosition;
 
         public void ConfigureAimView(Vector3 position, Vector3 euler, Transform ball)
         {
             aimViewPosition = position;
             aimViewEuler = euler;
             followTarget = ball;
+            _ballTarget = ball;
             SnapToAimView();
         }
 
         public void SnapToAimView()
         {
             _following = false;
-            transform.SetPositionAndRotation(aimViewPosition, Quaternion.Euler(aimViewEuler));
+            _staticHold = false;
+            _basePosition = aimViewPosition;
+            transform.SetPositionAndRotation(_basePosition + _shakeOffset, Quaternion.Euler(aimViewEuler));
         }
 
-        public void FollowBall() => _following = true;
+        public void FollowBall()
+        {
+            // Hand followTarget back to the real ball in case a Nuke throw's
+            // FollowRising() last repointed it at the sphere — otherwise the
+            // NEXT normal throw would chase the sphere instead of the ball.
+            followTarget = _ballTarget;
+            _activeFollowSmoothTime = followSmoothTime;
+            _staticHold = false;
+            _following = true;
+        }
+
+        /// <summary>
+        /// Nuke Shot only: slow deliberate chase of the rising sphere, distinct
+        /// from the fast normal ball-chase (FollowBall). Temporarily repoints
+        /// followTarget at the sphere — FollowBall() restores it to the real
+        /// ball afterwards, see the comment there.
+        /// </summary>
+        public void FollowRising(Transform target)
+        {
+            followTarget = target;
+            _activeFollowSmoothTime = nukeRiseFollowSmoothTime;
+            _staticHold = false;
+            _following = true;
+        }
+
+        /// <summary>
+        /// Nuke Shot only: hard cut (not a smooth move) to a fixed shot behind
+        /// and above the sphere's current (peak-height) position, looking at it.
+        /// The dramatic "it's about to come down" anticipation beat.
+        /// </summary>
+        public void CutToBehindAbove(Vector3 targetPosition)
+        {
+            _following = false;
+            // Held static (not reset to aimViewPosition) until the next
+            // SnapToAimView/FollowBall/FollowRising call — see _staticHold.
+            _staticHold = true;
+            Vector3 offset = new Vector3(0f, 2.5f, -4f); // above and behind; tune if it looks wrong, this is a first guess
+            _basePosition = targetPosition + offset;
+            transform.position = _basePosition + _shakeOffset;
+            // LookAt (not Quaternion.LookRotation) so this stays robust even if
+            // the offset above is ever tuned to something whose look direction
+            // could end up parallel to Vector3.up (LookRotation's default up
+            // vector), which would otherwise risk a degenerate rotation.
+            transform.LookAt(targetPosition);
+        }
+
+        /// <summary>
+        /// Deterministic screen shake (juice for e.g. the Nuke Shot explosion).
+        /// Purely a local camera-view cosmetic — never synced, never affects
+        /// LaunchParameters/scoring — so a sine wiggle instead of live Random
+        /// is fine even though the rest of throw-chaos avoids live randomness.
+        /// </summary>
+        public void Shake(float duration, float magnitude)
+        {
+            if (_shakeRoutine != null) StopCoroutine(_shakeRoutine);
+            _shakeRoutine = StartCoroutine(ShakeRoutine(duration, magnitude));
+        }
+
+        private IEnumerator ShakeRoutine(float duration, float magnitude)
+        {
+            float t = 0f;
+            while (t < duration)
+            {
+                t += Time.deltaTime;
+                float decay = 1f - (t / duration);
+                // Two dephased sine waves — deterministic wiggle, not UnityEngine.Random.
+                _shakeOffset = new Vector3(Mathf.Sin(t * 55f), Mathf.Sin(t * 71f + 1.3f), 0f) * magnitude * decay;
+                yield return null;
+            }
+            _shakeOffset = Vector3.zero;
+        }
 
         private void LateUpdate()
         {
-            if (!_following || followTarget == null) return;
+            if (_following && followTarget != null)
+            {
+                Vector3 desired = followTarget.position + followOffset;
+                _basePosition = Vector3.SmoothDamp(_basePosition, desired, ref _velocity, _activeFollowSmoothTime);
+                transform.LookAt(followTarget.position + Vector3.forward * 1.5f);
+            }
+            else if (!_staticHold)
+            {
+                // Not following and no static-cut framing to hold (e.g.
+                // CutToBehindAbove) — default back to the static aim view.
+                _basePosition = aimViewPosition;
+            }
+            // else: _staticHold true — leave _basePosition exactly as the last
+            // static-cut call set it, so that framing persists frame to frame
+            // instead of snapping back to aimViewPosition.
 
-            Vector3 desired = followTarget.position + followOffset;
-            transform.position = Vector3.SmoothDamp(transform.position, desired, ref _velocity, followSmoothTime);
-            transform.LookAt(followTarget.position + Vector3.forward * 1.5f);
+            // Additive on top of whatever follow/static logic above already
+            // computed, so shake never fights the existing positioning — and
+            // recomputed from the clean _basePosition every frame (not
+            // transform.position, which already has last frame's shake baked
+            // in) so the camera always returns exactly to anchor once a shake
+            // decays, instead of permanently drifting.
+            transform.position = _basePosition + _shakeOffset;
         }
     }
 }

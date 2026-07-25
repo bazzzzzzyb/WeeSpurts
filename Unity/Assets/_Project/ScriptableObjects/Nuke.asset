@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: eb17f237a157b4fcf91164a3a0f160b8, type: 3}
-  m_Name: BallConfig
+  m_Name: Nuke
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.BallConfig
   Mass: 6
   Radius: 0.11
@@ -52,3 +52,10 @@ MonoBehaviour:
   ConeSpinJitterMagnitude: 0.3
   WobbleForceMagnitude: 0
   WobbleFrequencyHz: 2
+  IsNuke: 1
+  NukeBlastRadius: 4
+  NukeExplosionForce: 14
+  NukeTweenDuration: 0.5
+  NukeLockOnPauseDuration: 0.6
+  NukeGreenZoneMin: 0.82
+  NukeGreenZoneMax: 0.85
