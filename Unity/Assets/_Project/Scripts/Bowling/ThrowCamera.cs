@@ -50,6 +50,41 @@ namespace WeeSpurts.Bowling
         // while the camera is still in the STATIC aim view, not following).
         private Vector3 _basePosition;
 
+        // --- Scripted-sequence hand-off (ThrowCameraSequence) --------------
+        // When a scripted camera move is running it computes a pose in Update()
+        // and pushes it here; this component stays the ONLY thing that writes
+        // transform.position, so shake still layers on top of a clean anchor.
+        // If ThrowCameraSequence isn't in the scene these stay false/identity
+        // and every line below behaves exactly as it did before it existed.
+        private bool _sequenceActive;
+        private Vector3 _sequencePosition;
+        private Quaternion _sequenceRotation = Quaternion.identity;
+
+        /// <summary>The static aim-phase framing. ThrowCameraSequence builds its
+        /// "take stance" beat ON these values (plus small nudge offsets) rather
+        /// than hard-coding a second copy of them.</summary>
+        public Vector3 AimViewPosition => aimViewPosition;
+        public Vector3 AimViewEuler => aimViewEuler;
+
+        /// <summary>
+        /// Called every frame by a running scripted camera move. Stores the pose
+        /// for LateUpdate to apply, and takes precedence over the follow/static
+        /// branches until EndSequenceFraming (or a Nuke camera call) hands it back.
+        /// </summary>
+        public void SetSequenceFraming(Vector3 position, Quaternion rotation)
+        {
+            _sequencePosition = position;
+            _sequenceRotation = rotation;
+            _basePosition = position;
+            _following = false;
+            _staticHold = false;
+            _sequenceActive = true;
+        }
+
+        /// <summary>Hands the camera back to the normal follow/static behaviour.</summary>
+        public void EndSequenceFraming() => _sequenceActive = false;
+        // -------------------------------------------------------------------
+
         public void ConfigureAimView(Vector3 position, Vector3 euler, Transform ball)
         {
             aimViewPosition = position;
@@ -61,6 +96,13 @@ namespace WeeSpurts.Bowling
 
         public void SnapToAimView()
         {
+            // Deliberately does NOT clear _sequenceActive. BowlingGameController
+            // calls this at the start of every roll, and a scripted camera move
+            // wants to EASE back to the aim framing from wherever it is — if this
+            // stole the camera back, every new roll would snap the shot out from
+            // under a live move. LateUpdate's sequence branch re-applies the
+            // sequence's own pose, so the write below is harmlessly overridden
+            // for that one frame while a move is running.
             _following = false;
             _staticHold = false;
             _basePosition = aimViewPosition;
@@ -89,6 +131,11 @@ namespace WeeSpurts.Bowling
             followTarget = target;
             _activeFollowSmoothTime = nukeRiseFollowSmoothTime;
             _staticHold = false;
+            // Unlike SnapToAimView/FollowBall, the Nuke explicitly RECLAIMS the
+            // camera: its canned sequence is the shot, so any scripted move must
+            // get out of the way. (ThrowCameraSequence also stands itself down on
+            // a Nuke throw — this is the second layer of defence.)
+            _sequenceActive = false;
             _following = true;
         }
 
@@ -103,6 +150,8 @@ namespace WeeSpurts.Bowling
             // Held static (not reset to aimViewPosition) until the next
             // SnapToAimView/FollowBall/FollowRising call — see _staticHold.
             _staticHold = true;
+            // Same reason as FollowRising: the Nuke owns the camera outright.
+            _sequenceActive = false;
             Vector3 offset = new Vector3(0f, 2.5f, -4f); // above and behind; tune if it looks wrong, this is a first guess
             _basePosition = targetPosition + offset;
             transform.position = _basePosition + _shakeOffset;
@@ -141,7 +190,20 @@ namespace WeeSpurts.Bowling
 
         private void LateUpdate()
         {
-            if (_following && followTarget != null)
+            if (_sequenceActive)
+            {
+                // A scripted camera move (ThrowCameraSequence) owns the framing
+                // this frame. It already handed us the pose in Update(), and
+                // Unity runs every Update() before any LateUpdate(), so this is
+                // always the CURRENT frame's pose — no execution-order tweaking.
+                // Re-applying _basePosition here (rather than trusting the value
+                // SetSequenceFraming wrote) matters because BowlingGameController
+                // may call SnapToAimView from a coroutine in between, which runs
+                // after Update but before LateUpdate.
+                _basePosition = _sequencePosition;
+                transform.rotation = _sequenceRotation;
+            }
+            else if (_following && followTarget != null)
             {
                 Vector3 desired = followTarget.position + followOffset;
                 _basePosition = Vector3.SmoothDamp(_basePosition, desired, ref _velocity, _activeFollowSmoothTime);

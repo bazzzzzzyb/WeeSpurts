@@ -171,6 +171,114 @@ namespace WeeSpurts.Gameplay
             return totals;
         }
 
+        /// <summary>
+        /// The LIVE score: everything earned so far, including the part of a
+        /// pending strike/spare bonus that is already known.
+        ///
+        /// Why this exists alongside GetTotal(). A strike scores 10 + the next
+        /// TWO rolls, so its frame box on a paper scorecard stays blank until
+        /// those rolls happen — and GetTotal(), which only sums fully-resolved
+        /// frames, therefore reads 0 for two more turns after a strike. Correct
+        /// bookkeeping, useless scoreboard: you knocked ten pins down and the
+        /// number said zero.
+        ///
+        /// This counts the pins immediately and folds each bonus in as soon as
+        /// it is known, so the number only ever goes UP and lands on exactly the
+        /// same value as GetTotal() once every frame has resolved. Use this for
+        /// anything a player looks at; use GetTotal()/GetFrameTotals() for the
+        /// formal scorecard boxes.
+        /// </summary>
+        public int GetProvisionalTotal()
+        {
+            int running = 0;
+            int i = 0;
+
+            for (int f = 0; f < 10 && i < _rolls.Count; f++)
+            {
+                if (f == 9)
+                {
+                    // The 10th frame has no NEXT frame to draw a bonus from —
+                    // its bonus rolls are already part of the frame itself, so
+                    // whatever has been rolled in it simply counts.
+                    for (int r = i; r < _rolls.Count; r++) running += _rolls[r];
+                    break;
+                }
+
+                if (_rolls[i] == 10) // strike: 10 + the next two rolls, as they arrive
+                {
+                    running += 10;
+                    if (i + 1 < _rolls.Count) running += _rolls[i + 1];
+                    if (i + 2 < _rolls.Count) running += _rolls[i + 2];
+                    i += 1;
+                }
+                else if (i + 1 < _rolls.Count)
+                {
+                    int frameSum = _rolls[i] + _rolls[i + 1];
+                    running += frameSum;
+                    // Spare: 10 + the next one roll, once it exists.
+                    if (frameSum == 10 && i + 2 < _rolls.Count) running += _rolls[i + 2];
+                    i += 2;
+                }
+                else
+                {
+                    // First roll of a frame that is still in progress — the pins
+                    // count right away even though the frame isn't finished.
+                    running += _rolls[i];
+                    i += 1;
+                }
+            }
+
+            return running;
+        }
+
+        /// <summary>
+        /// The rolls split up by frame, for DISPLAY only — so a scorecard can
+        /// show "X" or "7 /" under the right box instead of one flat list.
+        ///
+        /// Lives here rather than in the HUD on purpose: working out where a
+        /// frame's rolls start is exactly the walk GetFrameTotals() does (a
+        /// strike takes one roll, anything else takes two, the 10th takes
+        /// whatever is left). Duplicating that in UI code is how a scoreboard
+        /// starts quietly disagreeing with the score. A frame not yet reached
+        /// is null; a frame mid-roll has just the rolls thrown so far.
+        /// </summary>
+        public int[][] GetFrameRolls()
+        {
+            var frames = new int[10][];
+            int i = 0;
+
+            for (int f = 0; f < 10 && i < _rolls.Count; f++)
+            {
+                if (f == 9)
+                {
+                    // The 10th owns every remaining roll — up to three of them.
+                    int count = _rolls.Count - i;
+                    frames[9] = new int[count];
+                    for (int r = 0; r < count; r++) frames[9][r] = _rolls[i + r];
+                    break;
+                }
+
+                if (_rolls[i] == 10)
+                {
+                    frames[f] = new[] { 10 };
+                    i += 1;
+                }
+                else if (i + 1 < _rolls.Count)
+                {
+                    frames[f] = new[] { _rolls[i], _rolls[i + 1] };
+                    i += 2;
+                }
+                else
+                {
+                    // Frame in progress: only the first ball has been thrown.
+                    frames[f] = new[] { _rolls[i] };
+                    i += 1;
+                }
+            }
+
+            return frames;
+        }
+
         /// <summary>Best-known total so far (last resolved frame's running total).</summary>
         public int GetTotal()
         {

@@ -206,5 +206,79 @@ namespace WeeSpurts.Tests
             Assert.IsTrue(s.IsGameOver);
             Assert.AreEqual(rollCountBefore, s.Rolls.Count);
         }
+
+        // ---------------------------------------------------------------
+        // GetProvisionalTotal — the LIVE scoreboard number.
+        //
+        // GetTotal() only sums frames whose bonuses have fully resolved, so it
+        // reads 0 for two more turns after a strike. That is correct paper-
+        // scorecard bookkeeping and a useless scoreboard: you knock ten pins
+        // down and the number says nothing happened. GetProvisionalTotal()
+        // counts pins immediately and folds bonuses in as they become known.
+        //
+        // The contract these tests defend: it must NEVER disagree with the
+        // official score once a game is complete, and it must never go DOWN.
+        // ---------------------------------------------------------------
+
+        [Test]
+        public void ProvisionalTotal_CountsALoneStrikeImmediately()
+        {
+            var s = Play(10);
+            Assert.AreEqual(0, s.GetTotal());              // bonus unknown — correctly blank
+            Assert.AreEqual(10, s.GetProvisionalTotal());  // ...but the pins are down
+        }
+
+        [Test]
+        public void ProvisionalTotal_FoldsInStrikeBonusAsItArrives()
+        {
+            Assert.AreEqual(10, Play(10).GetProvisionalTotal());          // 10
+            Assert.AreEqual(30, Play(10, 10).GetProvisionalTotal());      // (10+10) + 10
+            Assert.AreEqual(60, Play(10, 10, 10).GetProvisionalTotal());  // 30 + 20 + 10
+        }
+
+        [Test]
+        public void ProvisionalTotal_CountsFirstRollOfAnUnfinishedFrame()
+        {
+            var s = Play(7);
+            Assert.AreEqual(7, s.GetProvisionalTotal());
+        }
+
+        [Test]
+        public void ProvisionalTotal_CountsSpareBonusOnlyOnceKnown()
+        {
+            Assert.AreEqual(10, Play(6, 4).GetProvisionalTotal());     // spare, bonus pending
+            // 20, not 19: the 5 counts TWICE by design — once as frame 1's spare
+            // bonus (10+5 = 15) and again as frame 2's own pins. Same rule the
+            // strike test above relies on for Play(10, 10) == 30.
+            Assert.AreEqual(20, Play(6, 4, 5).GetProvisionalTotal());
+        }
+
+        [Test]
+        public void ProvisionalTotal_NeverDecreases()
+        {
+            var s = new BowlingScorer();
+            int previous = 0;
+            foreach (int roll in new[] { 10, 7, 3, 9, 0, 10, 0, 8, 8, 2, 0, 6, 10, 10, 10, 8, 1 })
+            {
+                s.AddRoll(roll);
+                int now = s.GetProvisionalTotal();
+                Assert.GreaterOrEqual(now, previous, "provisional score went backwards");
+                previous = now;
+            }
+        }
+
+        [Test]
+        public void ProvisionalTotal_MatchesOfficialTotal_OnCompletedGames()
+        {
+            // Same games as the official-scoring tests above. Once every bonus
+            // has resolved there is no such thing as "provisional" any more, so
+            // these two numbers MUST agree — otherwise the live scoreboard would
+            // visibly correct itself at the end of a match.
+            Assert.AreEqual(0, Play(new int[20]).GetProvisionalTotal());
+            Assert.AreEqual(90, Play(9, 0, 9, 0, 9, 0, 9, 0, 9, 0, 9, 0, 9, 0, 9, 0, 9, 0, 9, 0).GetProvisionalTotal());
+            Assert.AreEqual(300, Play(10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10).GetProvisionalTotal());
+            Assert.AreEqual(150, Play(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5).GetProvisionalTotal());
+            Assert.AreEqual(133, Play(1, 4, 4, 5, 6, 4, 5, 5, 10, 0, 1, 7, 3, 6, 4, 10, 2, 8, 6).GetProvisionalTotal());
+        }
     }
 }
