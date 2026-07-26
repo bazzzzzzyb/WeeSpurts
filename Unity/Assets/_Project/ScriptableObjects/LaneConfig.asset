@@ -14,8 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.LaneConfig
   Length: 18
   Width: 1.4
-  PinSpacing: 0.3
-  PinHeight: 0.38
-  PinMass: 1.4
-  KnockedAngleDegrees: 40
+  BuildNeighbourLanes: 1
+  NeighbourLanesPerSide: 2
+  NeighbourLaneSpacing: 2.9
   DebugPlayerCount: 2

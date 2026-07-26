@@ -14,8 +14,13 @@ namespace WeeSpurts.Bowling
     /// BowlingGameController.SetBallConfig(). Safe to delete before shipping.
     ///
     /// SETUP: sits on the same GameObject as BowlingGameController.
-    /// GreyboxSceneBuilder adds it and seeds slot 1 with the default ball.
-    /// Drag more BallConfig assets into the list to get slots 2, 3, …
+    /// GreyboxSceneBuilder seeds the canonical five on every rebuild —
+    /// 1 default, 2 BouncyBall, 3 Cannonball, 4 Wobbler, 5 Nuke. Drag more
+    /// BallConfig assets into the list to get slots 6, 7, …
+    ///
+    /// Key 1 is guaranteed to be the default ball at runtime even if the
+    /// serialized list has lost it (see Start) — this list is ordinary
+    /// Inspector state and drifts easily.
     /// </summary>
     [RequireComponent(typeof(BowlingGameController))]
     public class BallConfigSwitcher : MonoBehaviour
@@ -36,10 +41,19 @@ namespace WeeSpurts.Bowling
 
         private void Start()
         {
-            // If nobody wired a list, fall back to whatever the controller has,
-            // so slot 1 always does something sensible.
-            if (configs.Count == 0 && _game.ActiveBallConfig != null)
-                configs.Add(_game.ActiveBallConfig);
+            // A null slot would silently shift every key after it (delete entry 2
+            // in the Inspector and suddenly 3 throws what 4 used to), so drop them
+            // before anything else looks at the list.
+            configs.RemoveAll(c => c == null);
+
+            // The default ball is ALWAYS key 1, whatever the serialized list says.
+            // This list is ordinary Inspector state, so it drifts: a hand-edit, a
+            // stray default Preset re-applying an old snapshot, or a scene saved
+            // mid-tinker can all drop the plain throw and leave only the powerups.
+            // Insert rather than Add so key 1 stays "the normal ball" and the
+            // variants keep their order behind it.
+            if (_game.ActiveBallConfig != null && !configs.Contains(_game.ActiveBallConfig))
+                configs.Insert(0, _game.ActiveBallConfig);
 
             if (_game.ActiveBallConfig != null)
                 ActiveName = _game.ActiveBallConfig.name;
@@ -75,6 +89,14 @@ namespace WeeSpurts.Bowling
             if (cfg != null && !configs.Contains(cfg))
                 configs.Add(cfg);
         }
+
+        /// <summary>
+        /// Editor-only: empties the list so GreyboxSceneBuilder can seed a known
+        /// slot order from scratch. Without this a rebuild MERGES into whatever
+        /// was already there — a stale default Preset, or a hand-edit — so the
+        /// key order depended on the component's history rather than the builder.
+        /// </summary>
+        public void EditorClearConfigs() => configs.Clear();
 #endif
     }
 }

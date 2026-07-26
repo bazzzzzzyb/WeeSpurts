@@ -31,14 +31,23 @@ namespace WeeSpurts.UI
             GUI.Box(new Rect(10, 10, 620, 26), _game.Phase);
 
             // ----- Controls hint -----
+            // Q/E spin is GONE — spin is now the 2D selector (SpinSelectorHud),
+            // dragged with the mouse or nudged with I/J/K/L, C to re-centre.
             GUI.Box(new Rect(10, 40, 620, 26),
-                "←/→ slide   Shift+←/→ angle   hold SPACE = power (release to throw)   Q/E = spin   F = reset frame");
+                "←/→ slide   Shift+←/→ angle   drag spin ball (or IJKL, C centres)   hold SPACE = power   F = reset");
 
             // ----- Active ball (sandbox switcher) -----
             if (_switcher != null)
             {
                 string hint = _switcher.Count > 1 ? $"  (press 1–{Mathf.Min(_switcher.Count, 9)})" : "";
-                GUI.Box(new Rect(640, 10, 300, 26), $"BALL: {_switcher.ActiveName}{hint}");
+                // Call out a nuke-armed ball explicitly. The name alone is not
+                // enough: IsNuke lives on the BallConfig ASSET, so a config named
+                // "BallConfig" can quietly be flagged as a nuke and every throw
+                // then resolves as one — which looks like the game is broken
+                // rather than like the ball is wrong. (This exact thing bit us.)
+                BallConfig active = _game.ActiveBallConfig;
+                string nukeFlag = active != null && active.IsNuke ? "   [NUKE ARMED]" : "";
+                GUI.Box(new Rect(640, 10, 300, 26), $"BALL: {_switcher.ActiveName}{hint}{nukeFlag}");
             }
 
             // ----- Aim readouts (lateral/angle/power/spin), visible any time we're aiming -----
@@ -46,8 +55,12 @@ namespace WeeSpurts.UI
             if (l != null && l.IsAiming)
             {
                 string powerText = l.ChargingPower ? $"{(int)(l.CurrentPower * 100)}%" : "-";
+                // Spin is 2D now: X is the hook (- left, + right), Y is roll vs
+                // skid (+ topspin, - backspin). Both numeric, next to the
+                // graphical selector, so a feel test can be reported as numbers.
                 GUI.Box(new Rect(10, 70, 620, 24),
-                    $"LATERAL {l.CurrentLateral:F2}   ANGLE {l.CurrentAngle:F1}°   POWER {powerText}   SPIN {l.CurrentSpin:F2}");
+                    $"LATERAL {l.CurrentLateral:F2}   ANGLE {l.CurrentAngle:F1}°   POWER {powerText}" +
+                    $"   SPIN X {l.CurrentSpin.x:+0.00;-0.00;0.00} Y {l.CurrentSpin.y:+0.00;-0.00;0.00}");
             }
 
             // ----- Power meter bar, only while actively charging -----
@@ -69,19 +82,86 @@ namespace WeeSpurts.UI
             }
 
             // ----- Scorecards -----
+            // Header spells out that the numbers are RUNNING totals. Without it
+            // the row reads as ten separate frame scores, and adding them up
+            // double-counts every bonus — a strike in frame 1 appears to add its
+            // 10 again in every later box. The score is the LAST number, never
+            // the sum. (This confused a real playtest; hence the label.)
             float y = 130;
+            string head = $"{"",-10}";
+            for (int f = 0; f < 10; f++) head += $"{f + 1,5}";
+            GUI.Box(new Rect(10, y, 700, 22), "  " + head + "   running →");
+            y += 24;
+
             foreach (PlayerData p in _game.Turns.Players)
             {
                 int?[] totals = p.Scorer.GetFrameTotals();
-                string line = $"{p.DisplayName,-10}";
+                int[][] frameRolls = p.Scorer.GetFrameRolls();
+
+                // Row 1: what was actually thrown, per frame. A strike's frame
+                // box correctly stays blank until its two bonus rolls exist —
+                // real scorecard behaviour, but it reads as "my strike didn't
+                // count", so these marks prove the roll WAS recorded instantly.
+                // Frame splitting comes from BowlingScorer.GetFrameRolls(), so
+                // no scoring logic is duplicated here and this can never
+                // disagree with the totals underneath it.
+                string markLine = $"{p.DisplayName,-10}";
+                for (int f = 0; f < 10; f++) markLine += $"{FrameMarks(frameRolls[f]),5}";
+
+                // Row 2: the formal running totals, aligned under their frame.
+                string totalLine = $"{"",-10}";
                 for (int f = 0; f < 10; f++)
-                    line += totals[f].HasValue ? $"{totals[f],4}" : "   -";
-                line += $"   TOTAL {p.Scorer.GetTotal()}";
+                    totalLine += totals[f].HasValue ? $"{totals[f],5}" : "    -";
+
+                // The LIVE score, not GetTotal(). GetTotal() only sums frames
+                // whose bonuses have fully resolved, so it reads 0 for two more
+                // turns after a strike — you knock ten pins down and the
+                // scoreboard says nothing happened. GetProvisionalTotal() counts
+                // the pins immediately and folds each bonus in as it becomes
+                // known, and lands on exactly the same number once the game
+                // finishes. The per-frame boxes still use the formal resolved
+                // totals, so the scorecard itself stays honest.
+                totalLine += $"   TOTAL {p.Scorer.GetProvisionalTotal()}";
 
                 bool isCurrent = p == _game.Turns.CurrentPlayer && !_game.MatchOver;
-                GUI.Box(new Rect(10, y, 620, 24), (isCurrent ? "► " : "  ") + line);
-                y += 26;
+                GUI.Box(new Rect(10, y, 700, 22), (isCurrent ? "► " : "  ") + markLine);
+                GUI.Box(new Rect(10, y + 20, 700, 22), "  " + totalLine);
+
+                y += 46;
             }
+        }
+
+        /// <summary>
+        /// Standard scorecard notation for one frame: X strike, / spare, - miss.
+        /// Presentation only — it never decides what a frame is worth, it just
+        /// draws what BowlingScorer already recorded.
+        /// </summary>
+        private static string FrameMarks(int[] rolls)
+        {
+            if (rolls == null || rolls.Length == 0) return "";
+
+            // Tracks pins standing AND whether the rack is fresh, because those
+            // two together are what separate a strike from a spare. Ten pins off
+            // a FRESH rack is a strike; ten off a rack you already threw at is a
+            // spare. Summing the pair instead would mark a gutter-then-all-ten
+            // as "-X" when it is really "-/", and in the 10th frame — where the
+            // rack resets mid-frame — would mark X then 4 then 6 as a spare
+            // across two different racks.
+            string s = "";
+            int standing = 10;
+            bool freshRack = true;
+
+            foreach (int r in rolls)
+            {
+                if (r == standing && freshRack) s += "X";
+                else if (r == standing && r > 0) s += "/";
+                else if (r == 0) s += "-";
+                else s += r.ToString();
+
+                if (r == standing) { standing = 10; freshRack = true; }
+                else { standing -= r; freshRack = false; }
+            }
+            return s;
         }
     }
 }

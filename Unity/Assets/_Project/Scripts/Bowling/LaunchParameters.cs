@@ -21,8 +21,24 @@ namespace WeeSpurts.Bowling
         /// <summary>Throw power, 0..1. Mapped to real force by BallConfig.</summary>
         public float Power01;
 
-        /// <summary>Spin, -1 (full left) .. +1 (full right).</summary>
-        public float Spin;
+        /// <summary>
+        /// Player-dialled spin as a point on the ball's face, clamped inside the
+        /// UNIT CIRCLE (see SpinModel.Clamp — a circle, not a square, so a full
+        /// diagonal isn't secretly stronger than full sideways).
+        ///
+        ///   X = side spin / axis tilt: -1 hooks left, +1 hooks right.
+        ///   Y = roll vs skid: +1 topspin (grips, curves EARLY, straighter),
+        ///       -1 backspin (skids, then breaks LATE and harder).
+        ///
+        /// Spin deliberately does NOT affect power — that stays entirely on the
+        /// timing meter (Tony's call), unlike pool where off-centre contact
+        /// costs you speed. SpinModel turns this into actual forces.
+        ///
+        /// Vector2 rather than two floats because Unity serializes it natively
+        /// and Mirror has a built-in writer for it, so the eventual networked
+        /// version needs no custom serializer.
+        /// </summary>
+        public Vector2 Spin;
 
         /// <summary>
         /// Random seed for any "chaos" effects (wobble, comedy events) so every
@@ -47,7 +63,7 @@ namespace WeeSpurts.Bowling
         public bool IsBackwardFumble;
 
         public override string ToString() =>
-            $"pos {LateralPosition01:F2}, angle {AngleDegrees:F1}°, power {Power01:P0}, spin {Spin:F2}, seed {Seed}, timing {TimingError01:+0.00;-0.00;0.00}"
+            $"pos {LateralPosition01:F2}, angle {AngleDegrees:F1}°, power {Power01:P0}, spin ({Spin.x:F2}, {Spin.y:F2}), seed {Seed}, timing {TimingError01:+0.00;-0.00;0.00}"
             + (IsBackwardFumble ? ", BACKWARD FUMBLE" : "");
     }
 }

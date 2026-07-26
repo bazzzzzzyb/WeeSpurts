@@ -4,7 +4,8 @@
     "references": [
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "WeeSpurts.Runtime"
+        "WeeSpurts.Runtime",
+        "WeeSpurts.Editor"
     ],
     "includePlatforms": [
         "Editor"

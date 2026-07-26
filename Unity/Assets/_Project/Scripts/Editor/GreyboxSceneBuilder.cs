@@ -47,16 +47,61 @@ namespace WeeSpurts.Editor
             // ----- 4. Environment -----
             GameObject env = new GameObject("Environment");
 
+            // Rails sit this far either side of a lane's centre line, and their
+            // box is 0.25 wide, so their OUTER face is another 0.125 beyond that.
+            float railOffset = width * 0.5f + 0.55f;
+            const float RailHalfThickness = 0.125f;
+            Vector3 railScale = new Vector3(0.25f, 0.35f, length + 4f);
+
+            // How wide the whole built alley is, INCLUDING the cosmetic neighbour
+            // lanes below. Floor and backstop are derived from this rather than
+            // from the single lane's width: otherwise the neighbour lanes would
+            // float over nothing, and the backstop would visibly END inside the
+            // throw camera's impact framing (which spans several lane widths at
+            // the pins). When neighbour lanes are off this reduces to almost
+            // exactly the old width+3 / width+2.4 numbers.
+            int neighbourCount = laneConfig.BuildNeighbourLanes ? laneConfig.NeighbourLanesPerSide : 0;
+            float outermostEdge = neighbourCount * laneConfig.NeighbourLaneSpacing + railOffset + RailHalfThickness;
+
             MakeBox(env, "Floor", new Vector3(0, -0.051f, length * 0.5f - 2f),
-                    new Vector3(width + 3f, 0.1f, length + 8f), railMat);
+                    new Vector3(outermostEdge * 2f + 1.5f, 0.1f, length + 8f), railMat);
             MakeBox(env, "Lane", new Vector3(0, -0.05f, length * 0.5f),
                     new Vector3(width, 0.102f, length + 1.5f), laneMat);
-            MakeBox(env, "RailLeft", new Vector3(-(width * 0.5f + 0.55f), 0.12f, length * 0.5f),
-                    new Vector3(0.25f, 0.35f, length + 4f), railMat);
-            MakeBox(env, "RailRight", new Vector3(width * 0.5f + 0.55f, 0.12f, length * 0.5f),
-                    new Vector3(0.25f, 0.35f, length + 4f), railMat);
+            MakeBox(env, "RailLeft", new Vector3(-railOffset, 0.12f, length * 0.5f),
+                    railScale, railMat);
+            MakeBox(env, "RailRight", new Vector3(railOffset, 0.12f, length * 0.5f),
+                    railScale, railMat);
             MakeBox(env, "Backstop", new Vector3(0, 0.5f, length + 2.5f),
-                    new Vector3(width + 2.4f, 1.2f, 0.25f), railMat);
+                    new Vector3(outermostEdge * 2f + 1f, 1.2f, 0.25f), railMat);
+
+            // ----- 4b. Cosmetic neighbour lanes -----
+            // PURE SET DRESSING for the wide camera beats: lane surface + rails
+            // only. No pins, no Rigidbody, no PinDeck registration, no scoring,
+            // and every collider stripped (MakeCosmeticBox) so nothing here can
+            // ever touch the ball. Parented under their own root so it is obvious
+            // at a glance which geometry is real and which is scenery.
+            if (neighbourCount > 0)
+            {
+                GameObject neighbours = new GameObject("NeighbourLanes");
+                for (int side = -1; side <= 1; side += 2)   // -1 = left, +1 = right
+                {
+                    for (int n = 1; n <= neighbourCount; n++)
+                    {
+                        float centreX = side * n * laneConfig.NeighbourLaneSpacing;
+                        string label = (side < 0 ? "L" : "R") + n;
+
+                        MakeCosmeticBox(neighbours, "NeighbourLane" + label,
+                                        new Vector3(centreX, -0.05f, length * 0.5f),
+                                        new Vector3(width, 0.102f, length + 1.5f), laneMat);
+                        MakeCosmeticBox(neighbours, "NeighbourRail" + label + "Left",
+                                        new Vector3(centreX - railOffset, 0.12f, length * 0.5f),
+                                        railScale, railMat);
+                        MakeCosmeticBox(neighbours, "NeighbourRail" + label + "Right",
+                                        new Vector3(centreX + railOffset, 0.12f, length * 0.5f),
+                                        railScale, railMat);
+                    }
+                }
+            }
 
             // ----- 5. Light -----
             var lightGo = new GameObject("Directional Light");
@@ -135,33 +180,105 @@ namespace WeeSpurts.Editor
             spawn.transform.position = new Vector3(0f, ballConfig.SpawnHeight, 0f);
             ballGo.transform.position = spawn.transform.position;
 
-            // ----- 8b. Thrower proxy (Body English greybox) -----
-            // Stands behind and below the ball's spawn point, roughly at
-            // human height, at the foul line. No rig yet — a capsule reacts
-            // to throw timing until a Quaternius character implements the
-            // same IThrowReactionActor interface.
-            Material throwerMat = LoadOrCreateMaterial("ThrowerMat", new Color(0.9f, 0.75f, 0.55f));
-            // LoadOrCreateMaterial returns the ASSET AS-IS on every rebuild after
-            // the first (see its "if (existing != null) return existing;" early-out),
-            // so alpha/transparency can't be baked into the color argument above --
-            // it would only apply the one time the asset didn't exist yet. Force it
-            // unconditionally, every build, directly on the returned Material.
-            MakeTransparent(throwerMat, 0.35f);
-            GameObject throwerGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            throwerGo.name = "ThrowerProxy";
-            throwerGo.transform.position = spawn.transform.position + new Vector3(0f, -(ballConfig.SpawnHeight) + 1f, -0.8f);
-            throwerGo.GetComponent<Renderer>().sharedMaterial = throwerMat;
-            // Purely cosmetic (see CapsuleThrowReactionActor's doc comment) — it must
-            // never be a physical obstacle. Without this, the default CapsuleCollider
-            // that CreatePrimitive attaches sits ~0.8m behind the ball's spawn point
-            // and blocks any throw sent toward -Z, e.g. the backward-fumble gag.
-            Object.DestroyImmediate(throwerGo.GetComponent<CapsuleCollider>());
-            CapsuleThrowReactionActor throwReaction = throwerGo.AddComponent<CapsuleThrowReactionActor>();
+            // ----- 8b. Thrower (Body English) -----
+            // Stands just behind the foul line, below the ball's spawn point.
+            // Prefers the rigged PlayerCharacter prefab that CharacterSetupTool
+            // builds; falls back to the original greybox capsule if that prefab
+            // hasn't been generated yet, so a fresh clone still builds a working
+            // scene. Both implement IThrowReactionActor, so everything
+            // downstream (BowlingGameController) is identical either way.
+            //
+            // The character's origin is at its FEET, unlike the capsule (origin
+            // at its middle), so the two need different Y — hence the separate
+            // positions rather than one shared vector.
+            Vector3 throwerGround = new Vector3(0f, 0f, -0.8f);
+            MonoBehaviour throwReaction;
+            // The thrower object itself, whichever branch produced it. Needed
+            // below so ThrowerAimSlide can be attached to either one.
+            GameObject throwerObject;
+
+            // EVERY height on ThrowCameraSequenceConfig is measured relative to
+            // this transform, and they were all tuned against the capsule, whose
+            // pivot sat at floor+1m. The character's pivot is at its FEET, so
+            // handing the camera the character's own transform would silently
+            // drop all six beats by a metre and aim them at the floor. Instead
+            // both branches hand the camera a pivot at the SAME floor+1m height,
+            // which keeps the existing camera tuning valid as-is.
+            //
+            // The anchor is a STANDALONE object at the scene root, NOT a child
+            // of the thrower — deliberately, now that ThrowerAimSlide moves the
+            // character during aim. Parented, every camera beat would slide
+            // sideways each time Tony adjusts lateral aim, and a frame that
+            // moves while you aim makes it harder to judge where you're
+            // pointing. Wii Sports keeps the aim camera FIXED and lets the
+            // character slide within it (Tony's call); a fixed world position is
+            // what implements that, and it keeps the six tuned
+            // ThrowCameraSequenceConfig beats valid byte-for-byte.
+            const float CameraAnchorHeight = 1f;
+
+            GameObject characterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(CharacterSetupTool.PlayerCharacterPrefabPath);
+            if (characterPrefab != null)
+            {
+                GameObject throwerGo = (GameObject)PrefabUtility.InstantiatePrefab(characterPrefab);
+                throwerGo.name = "Thrower";
+                throwerGo.transform.position = throwerGround;
+                // Face down the lane (+Z), the direction the ball travels.
+                throwerGo.transform.rotation = Quaternion.identity;
+                throwReaction = throwerGo.GetComponent<CharacterThrowReactionActor>();
+                // A prefab generated before this component existed — or one where
+                // the component ended up on the model child instead of the wrapper
+                // root — returns null here, and BowlingGameController's null-safe
+                // `_throwReaction?.PlayReaction(p)` would then swallow it silently:
+                // no error, the thrower just never reacts again. Say so out loud.
+                if (throwReaction == null)
+                    Debug.LogWarning("[Greybox] The PlayerCharacter prefab has no CharacterThrowReactionActor on " +
+                                     "its root, so Body English will not play. Re-run WeeSpurts -> Set Up " +
+                                     "Player Character to regenerate it, then rebuild the scene.");
+
+                throwerObject = throwerGo;
+            }
+            else
+            {
+                Debug.LogWarning("[Greybox] No PlayerCharacter prefab found — using the greybox capsule thrower. " +
+                                 "Run WeeSpurts -> Set Up Player Character, then rebuild the scene.");
+                Material throwerMat = LoadOrCreateMaterial("ThrowerMat", new Color(0.9f, 0.75f, 0.55f));
+                // LoadOrCreateMaterial returns the ASSET AS-IS on every rebuild after
+                // the first (see its "if (existing != null) return existing;" early-out),
+                // so alpha/transparency can't be baked into the color argument above --
+                // it would only apply the one time the asset didn't exist yet. Force it
+                // unconditionally, every build, directly on the returned Material.
+                MaterialTransparency.Apply(throwerMat, 0.35f);
+                GameObject throwerGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                throwerGo.name = "ThrowerProxy";
+                // Capsule is 2m tall with a centre origin, so +1 puts its feet on
+                // the floor. (It happens to sit at the camera anchor's height too,
+                // but it is no longer used AS the anchor — see below.)
+                throwerGo.transform.position = throwerGround + new Vector3(0f, CameraAnchorHeight, 0f);
+                throwerGo.GetComponent<Renderer>().sharedMaterial = throwerMat;
+                // Purely cosmetic (see CapsuleThrowReactionActor's doc comment) — it must
+                // never be a physical obstacle. Without this, the default CapsuleCollider
+                // that CreatePrimitive attaches sits ~0.8m behind the ball's spawn point
+                // and blocks any throw sent toward -Z, e.g. the backward-fumble gag.
+                Object.DestroyImmediate(throwerGo.GetComponent<CapsuleCollider>());
+                throwReaction = throwerGo.AddComponent<CapsuleThrowReactionActor>();
+                throwerObject = throwerGo;
+            }
+
+            // Both branches share ONE anchor, built the same way, at the scene
+            // root. Previously the capsule served as its own anchor — harmless
+            // while it never moved, but it would now slide with the aim and drag
+            // the camera with it, so the two branches would have quietly
+            // disagreed about whether the camera moves. A fixed anchor rather
+            // than a real bone, too: bones move with the animation, and a camera
+            // anchored to a moving chest would jitter through the reaction clips.
+            GameObject cameraAnchor = new GameObject("CameraAnchor");
+            cameraAnchor.transform.position = throwerGround + new Vector3(0f, CameraAnchorHeight, 0f);
+            Transform throwerCameraAnchor = cameraAnchor.transform;
 
             // ----- 9. Camera -----
             GameObject camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";
-            camGo.AddComponent<Camera>();
+            Camera cam = camGo.AddComponent<Camera>();
             camGo.AddComponent<AudioListener>();
             ThrowCamera throwCam = camGo.AddComponent<ThrowCamera>();
             // Raised + pulled back and pitched down a touch so the chest-height
@@ -199,12 +316,24 @@ namespace WeeSpurts.Editor
             aimPreview.Configure(launcher, controller, aimLine);
             EditorUtility.SetDirty(aimPreview);
 
-            // Sandbox ball switcher (press 1-9 in Play mode). Seed slot 1 with the
-            // default ball, then pick up any hand-tuned variant assets that already
-            // exist next to it (BouncyBall, Cannonball, ...) so they're selectable
-            // without manually dragging them into the Inspector list. We only load
-            // existing assets here, never create them — variants are Tony's to author.
+            // Thrower slides with the aim. Attached here rather than up in
+            // section 8b because it needs the launcher and controller, which
+            // don't exist until this section. Reads HalfLaneWidth off the same
+            // controller AimPreview just got, so character, preview and resolved
+            // throw are all bound to one number.
+            ThrowerAimSlide aimSlide = throwerObject.AddComponent<ThrowerAimSlide>();
+            aimSlide.Configure(launcher, controller);
+            EditorUtility.SetDirty(aimSlide);
+
+            // Sandbox ball switcher (press 1-9 in Play mode). A rebuild always
+            // produces the SAME five slots in the SAME order — 1 default,
+            // 2 BouncyBall, 3 Cannonball, 4 Wobbler, 5 Nuke — so muscle memory
+            // holds between rebuilds. Clear first: this list is ordinary
+            // serialized state, and merging into whatever a stale default Preset
+            // or hand-edit left behind is how the plain throw went missing from
+            // slot 1 while the four powerups stayed.
             BallConfigSwitcher switcher = gameGo.AddComponent<BallConfigSwitcher>();
+            switcher.EditorClearConfigs();
             switcher.EditorAddConfig(ballConfig);
             foreach (string variantName in new[] { "BouncyBall", "Cannonball" })
             {
@@ -248,6 +377,9 @@ namespace WeeSpurts.Editor
                 EditorUtility.SetDirty(nukeConfig);
             }
             switcher.EditorAddConfig(nukeConfig);
+            // Every other configured component in this builder is marked dirty;
+            // this one was relying on the scene save picking it up.
+            EditorUtility.SetDirty(switcher);
 
             // ----- Nuke Shot presentation layer (greybox) -----
             // Pure Transform-tweened visual, NOT a physics object — see
@@ -309,7 +441,45 @@ namespace WeeSpurts.Editor
             controller.SetNukeResolver(nukeResolver);
             EditorUtility.SetDirty(nukeResolver);
 
+            // ----- 10b. Scripted throw camera (the seven-beat cinematic move) -----
+            // Same create-if-missing pattern as Wobbler/Nuke above: only stamp
+            // creation-time values the FIRST time the asset appears, so re-running
+            // this builder after Tony hand-tunes the camera never stomps his work.
+            string sequencePath = ProjectRoot + "/ScriptableObjects/ThrowCameraSequenceConfig.asset";
+            bool sequenceConfigAlreadyExisted =
+                AssetDatabase.LoadAssetAtPath<ThrowCameraSequenceConfig>(sequencePath) != null;
+            ThrowCameraSequenceConfig sequenceConfig = LoadOrCreateAsset<ThrowCameraSequenceConfig>(sequencePath);
+            if (!sequenceConfigAlreadyExisted)
+            {
+                // A freshly created asset already carries every tuned default from
+                // ThrowCameraSequenceConfig's own C# field initialisers, so there is
+                // nothing extra to stamp here. This branch exists so that any future
+                // creation-time default has an obvious home which can never run on
+                // a rebuild over an existing asset.
+                EditorUtility.SetDirty(sequenceConfig);
+            }
+
+            ThrowCameraSequence throwCamSequence = camGo.AddComponent<ThrowCameraSequence>();
+            // Same SerializedObject pattern as NukeShotResolver above: every field
+            // is a private [SerializeField], and writing them this way is what makes
+            // the wiring survive a scene reload (the AimPreview lesson, again).
+            var sequenceSO = new SerializedObject(throwCamSequence);
+            sequenceSO.FindProperty("config").objectReferenceValue = sequenceConfig;
+            sequenceSO.FindProperty("launcher").objectReferenceValue = launcher;
+            sequenceSO.FindProperty("game").objectReferenceValue = controller;
+            sequenceSO.FindProperty("ball").objectReferenceValue = ball;
+            sequenceSO.FindProperty("pinDeck").objectReferenceValue = deckGo.transform;
+            sequenceSO.FindProperty("thrower").objectReferenceValue = throwerCameraAnchor;
+            sequenceSO.FindProperty("laneConfig").objectReferenceValue = laneConfig;
+            sequenceSO.FindProperty("sequenceCamera").objectReferenceValue = cam;
+            sequenceSO.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(throwCamSequence);
+
             gameGo.AddComponent<DebugHud>();
+            // The 2D spin selector (replaces the old Q/E spin keys). Same
+            // GameObject as DebugHud — both are OnGUI overlays that find the
+            // controller via RequireComponent, so neither needs wiring.
+            gameGo.AddComponent<SpinSelectorHud>();
             EditorUtility.SetDirty(controller);
             EditorUtility.SetDirty(switcher);
 
@@ -329,7 +499,7 @@ namespace WeeSpurts.Editor
 
         // ---------- helpers ----------
 
-        private static void MakeBox(GameObject parent, string name, Vector3 position, Vector3 scale, Material mat)
+        private static GameObject MakeBox(GameObject parent, string name, Vector3 position, Vector3 scale, Material mat)
         {
             GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = name;
@@ -337,6 +507,23 @@ namespace WeeSpurts.Editor
             go.transform.position = position;
             go.transform.localScale = scale;
             go.GetComponent<Renderer>().sharedMaterial = mat;
+            return go;
+        }
+
+        /// <summary>
+        /// MakeBox for DECORATION: identical, but with the collider removed.
+        ///
+        /// THE LESSON THIS FILE HAS NOW LEARNED THREE TIMES (ThrowerProxy, the
+        /// Nuke sphere, and now the neighbour lanes): GameObject.CreatePrimitive
+        /// ALWAYS attaches a collider. Anything purely visual must have it removed
+        /// or it silently becomes a physical obstacle — an invisible wall that
+        /// only shows up as "why did the ball bounce off nothing?" hours later.
+        /// </summary>
+        private static GameObject MakeCosmeticBox(GameObject parent, string name, Vector3 position, Vector3 scale, Material mat)
+        {
+            GameObject go = MakeBox(parent, name, position, scale, mat);
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            return go;
         }
 
         private static Material LoadOrCreateMaterial(string name, Color color)
@@ -353,60 +540,6 @@ namespace WeeSpurts.Editor
             EnsureFolder(ProjectRoot + "/Materials");
             AssetDatabase.CreateAsset(mat, path);
             return mat;
-        }
-
-        /// <summary>
-        /// Forces a material into ghostly alpha-blended transparency, unconditionally,
-        /// every call -- unlike LoadOrCreateMaterial's color argument (which only ever
-        /// takes effect the one time the .mat asset is first created), this always
-        /// re-applies, so it also fixes a material that already exists on disk in a
-        /// half-configured or inconsistent state.
-        ///
-        /// Covers both possible shaders LoadOrCreateMaterial may have picked -- URP's
-        /// "Universal Render Pipeline/Lit" (or Unlit) and the Built-in Standard shader
-        /// -- since Set*/Enable/DisableKeyword calls for a property/keyword that
-        /// doesn't exist on the material's actual shader are documented no-ops, not
-        /// errors, so applying both is safe.
-        ///
-        /// Uses plain (non-premultiplied) alpha blending on both pipelines:
-        ///  - URP Lit/Unlit: Surface Type = Transparent (_Surface=1), Blend = Alpha
-        ///    (_Blend=0). NOTE: _ALPHAPREMULTIPLY_ON is URP's "Premultiply" blend mode
-        ///    (_Blend=1), not "Alpha" (_Blend=0) -- URP's own LitShader editor leaves
-        ///    it (and Multiply's _ALPHAMODULATE_ON) DISABLED for plain Alpha blend, so
-        ///    it's deliberately left off here despite being tempting to enable.
-        ///  - Built-in Standard: Rendering Mode = Fade (_Mode=2, _ALPHABLEND_ON), not
-        ///    "Transparent" (_Mode=3). Standard's _Mode=3 is a *premultiplied* mode
-        ///    that pairs with _ALPHAPREMULTIPLY_ON and SrcBlend=One, not SrcAlpha --
-        ///    Fade is the mode that actually matches the SrcAlpha/OneMinusSrcAlpha
-        ///    blend below (and Fade suits a plain greybox capsule fine; it has no
-        ///    specular highlight worth preserving the way Transparent mode would).
-        /// </summary>
-        private static void MakeTransparent(Material mat, float alpha)
-        {
-            Color c = mat.color;
-            c.a = alpha;
-            mat.color = c;
-
-            // ----- URP Lit/Unlit -----
-            mat.SetFloat("_Surface", 1f); // 0 = Opaque, 1 = Transparent
-            mat.SetFloat("_Blend", 0f);   // 0 = Alpha
-            mat.SetOverrideTag("RenderType", "Transparent");
-            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            mat.DisableKeyword("_ALPHATEST_ON");
-            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON"); // that's Premultiply mode, not Alpha
-            mat.DisableKeyword("_ALPHAMODULATE_ON");    // that's Multiply mode, not Alpha
-
-            // ----- Built-in Standard -----
-            mat.SetFloat("_Mode", 2f); // 2 = Fade (matches SrcAlpha/OneMinusSrcAlpha below)
-            mat.DisableKeyword("_ALPHATEST_ON");
-            mat.EnableKeyword("_ALPHABLEND_ON");
-            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-
-            // ----- Shared blend state (both pipelines read these via the same names) -----
-            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            mat.SetInt("_ZWrite", 0);
-            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
         }
 
         private static T LoadOrCreateAsset<T>(string path) where T : ScriptableObject

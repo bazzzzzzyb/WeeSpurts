@@ -25,8 +25,30 @@ namespace WeeSpurts.Bowling
         [Tooltip("Forward speed in m/s at full power. Real pro throws ~9 m/s. Go higher for comedy.")]
         public float MaxLaunchSpeed = 14f;
 
-        [Tooltip("Sideways curve force applied while rolling, per unit of spin.")]
+        [Tooltip("Sideways curve force at FULL side spin (LaunchParameters.Spin.x = ±1). " +
+                 "This is the PLAYER'S dialled hook only — the mistiming Hook from a bad " +
+                 "release is a separate force with its own knob (HookForceMagnitude below), " +
+                 "and the two are added together so they can fight each other. Raise this " +
+                 "relative to HookForceMagnitude to make skill beat fumbles; lower it to let " +
+                 "chaos win.")]
         public float SpinCurveForce = 6f;
+
+        [Tooltip("How far down the lane (meters) the spin takes to fully 'roll out'. The " +
+                 "top/bottom spin ramp is measured against this distance, so a shorter value " +
+                 "front-loads every curve and a longer one stretches the late break out past " +
+                 "the pins. ~18 is about foul line to headpin.")]
+        public float SpinRampDistance = 18f;
+
+        [Tooltip("How much vertical spin changes the TOTAL amount of hook (see SpinModel). " +
+                 "0.6 means topspin curves 0.4x as much (grips and drives straight) and " +
+                 "backspin 1.6x as much (skids, then breaks hard and late). Set to 0 to make " +
+                 "the vertical axis purely about WHEN the curve happens, not how much.")]
+        [Range(0f, 1f)] public float RollSkidHookScale = 0.6f;
+
+        [Tooltip("Extra forward force from TOPSPIN at full up-spin ('grips and drives'). " +
+                 "Backspin gets no penalty — spin must never fight the timing meter for " +
+                 "control of speed. Keep this small; it is flavour, not a second power system.")]
+        public float SpinDriveForce = 3f;
 
         [Tooltip("Height (meters) the ball starts at, measured to its center. " +
                  "~1.3 = chest height, so the ball drops onto the lane when thrown. " +
@@ -61,15 +83,21 @@ namespace WeeSpurts.Bowling
 
         [Tooltip("Max continuous sideways 'Hook' force (same units as SpinCurveForce) " +
                  "applied while the ball rolls, at full chaos intensity. Direction comes " +
-                 "from the sign of TimingError01 (early vs. late release hook opposite ways).")]
+                 "from the sign of TimingError01 (early vs. late release hook opposite ways). " +
+                 "SEPARATE from the player's dialled spin on purpose: this is the fumble, " +
+                 "that is the intent, and they are ADDED so a hard release still slices right " +
+                 "even if you dialled left. Compare against SpinCurveForce to set the balance — " +
+                 "at 4 vs 6, intent wins but a big whiff guts it.")]
         public float HookForceMagnitude = 4f;
 
         [Tooltip("Max one-time launch-angle offset (degrees) baked in at release, at full " +
                  "chaos intensity. Represents the throw itself coming out slightly wrong.")]
         public float ConeAngleJitterDegrees = 6f;
 
-        [Tooltip("Max one-time spin offset (same -1..1 scale as LaunchParameters.Spin) " +
-                 "baked in at release, at full chaos intensity.")]
+        [Tooltip("Max one-time SIDE-spin offset (same -1..1 scale as LaunchParameters.Spin.x) " +
+                 "baked in at release, at full chaos intensity. Applies to the horizontal axis " +
+                 "only: a fumble shoves the ball sideways, it doesn't change whether you rolled " +
+                 "it or skidded it.")]
         public float ConeSpinJitterMagnitude = 0.3f;
 
         [Header("Feel — Wobbler (prototype)")]

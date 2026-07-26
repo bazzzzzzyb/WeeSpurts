@@ -28,7 +28,9 @@ namespace WeeSpurts.Bowling
         private bool _inFlight;
         private float _throwStartTime;
         private float _slowSince = -1f;
-        private float _spin;
+        private Vector2 _spin;      // player-dialled 2D spin (see SpinModel)
+        private float _launchZ;     // down-lane origin for the spin ramp, captured at release
+        private Vector3 _launchDir; // stored so topspin's forward drive can't feed back on itself
         private float _hookForce; // precomputed sign+magnitude Hook force, set once in Launch()
         private float _wobblePhase; // radians, seeded per-throw so the weave differs per Seed
         private float _wobbleElapsed; // seconds, accumulated from Time.fixedDeltaTime (NOT Time.time — see FixedUpdate)
@@ -107,7 +109,9 @@ namespace WeeSpurts.Bowling
                 Vector3 backDir = Quaternion.Euler(0f, p.AngleDegrees, 0f) * Vector3.back;
                 BallVelocity = backDir * config.MinLaunchSpeed;
                 _rb.angularVelocity = new Vector3(-config.MinLaunchSpeed / Mathf.Max(0.01f, config.Radius), 0f, 0f);
-                _spin = 0f;
+                _spin = Vector2.zero;
+                _launchZ = transform.position.z;
+                _launchDir = backDir;
                 _hookForce = 0f;
                 // State hygiene: this early-return branch skips the non-fumble path
                 // below that normally resets these. Currently harmless (FixedUpdate's
@@ -133,6 +137,10 @@ namespace WeeSpurts.Bowling
             // from LaunchParameters.Seed keeps this reproducible across clients.
             System.Random coneRng = new System.Random(p.Seed);
             float angleJitter = ((float)coneRng.NextDouble() * 2f - 1f) * config.ConeAngleJitterDegrees * intensity;
+            // Horizontal axis only — a fumble shoves the ball sideways, it doesn't
+            // change whether the player rolled it or skidded it. Kept to ONE draw,
+            // in the same position in the RNG stream as before the 2D spin change,
+            // so an existing Seed still produces the identical wobble phase below.
             float spinJitter = ((float)coneRng.NextDouble() * 2f - 1f) * config.ConeSpinJitterMagnitude * intensity;
 
             // Wobbler (ball personality, not timing chaos): a third draw from the
@@ -163,7 +171,15 @@ namespace WeeSpurts.Bowling
             // Rolling spin around the travel axis makes the curve feel physical.
             _rb.angularVelocity = new Vector3(speed / Mathf.Max(0.01f, _config.Radius), 0f, 0f);
 
-            _spin = Mathf.Clamp(p.Spin + spinJitter, -1f, 1f);
+            // The spin ramp is measured from where this throw actually started,
+            // not from the world origin, so a throw released from the far left of
+            // the lane ramps identically to one from the middle.
+            _launchZ = transform.position.z;
+            _launchDir = dir;
+
+            // Player spin + the release fumble, clamped back into the unit circle
+            // so a jittered diagonal can't exceed full spin.
+            _spin = SpinModel.Clamp(p.Spin + new Vector2(spinJitter, 0f));
             _inFlight = true;
             _throwStartTime = Time.time;
             _slowSince = -1f;
@@ -173,13 +189,44 @@ namespace WeeSpurts.Bowling
         {
             if (!_inFlight) return;
 
-            // Spin = a steady sideways force while the ball is moving forward.
-            // Simple, tunable, and reproducible from LaunchParameters alone.
-            if (Mathf.Abs(_spin) > 0.01f && BallVelocity.z > 0.5f)
-                _rb.AddForce(Vector3.right * (_spin * _config.SpinCurveForce), ForceMode.Force);
+            // How far into the spin ramp we are: 0 at release, 1 once the ball has
+            // rolled out. This is what makes topspin bite EARLY and backspin break
+            // LATE — the same dialled spin produces a different force depending on
+            // where the ball is down the lane. See SpinModel.RampShape.
+            float rampProgress = SpinModel.Progress01(transform.position.z - _launchZ,
+                                                      _config.SpinRampDistance);
 
-            // Hook: separate additional force layered on top of player-dialed spin,
-            // driven purely by release timing (set once in Launch(), constant here).
+            // Player spin: a sideways force shaped by the ramp above.
+            if (Mathf.Abs(_spin.x) > 0.01f && BallVelocity.z > 0.5f)
+            {
+                float playerSpinForce = SpinModel.LateralForce(
+                    _spin, rampProgress, _config.SpinCurveForce, _config.RollSkidHookScale);
+                _rb.AddForce(Vector3.right * playerSpinForce, ForceMode.Force);
+            }
+
+            // Topspin drives forward ("grips and rolls out"). Along the STORED
+            // launch direction, not current velocity, so it pushes the ball along
+            // its original line instead of amplifying whatever the hook has already
+            // done to it — that feedback loop would make topspin curve MORE, which
+            // is the opposite of the point.
+            if (_spin.y > 0.01f && BallVelocity.z > 0.5f)
+                _rb.AddForce(_launchDir * SpinModel.DriveForce(_spin, _config.SpinDriveForce),
+                             ForceMode.Force);
+
+            // Hook (GameBible §8 — the mistiming fumble): a SEPARATE sideways force,
+            // driven purely by release timing, set once in Launch() and constant for
+            // the whole roll.
+            //
+            // THIS IS ADDITIVE WITH PLAYER SPIN, AND THAT IS THE DESIGN. The two
+            // compete: dial full left spin, then release hard, and the fumble still
+            // drags the ball right — your intent survives but gets mauled. Neither
+            // force scales the other, and each has its own config knob
+            // (SpinCurveForce vs HookForceMagnitude) precisely so one can't quietly
+            // drown out the other when the other is tuned.
+            //
+            // Deliberately NOT ramped like player spin: the fumble reads as a
+            // constant wrongness from the instant of release, which keeps it
+            // visually distinguishable from a dialled late break.
             if (_hookForce != 0f && BallVelocity.z > 0.5f)
                 _rb.AddForce(Vector3.right * _hookForce, ForceMode.Force);
 

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb17f237a157b4fcf91164a3a0f160b8, type: 3}
   m_Name: BallConfig
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.BallConfig
-  Mass: 6
+  Mass: 14
   Radius: 0.11
   MinLaunchSpeed: 4
   MaxLaunchSpeed: 14
@@ -47,8 +47,15 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  HookForceMagnitude: 4
+  HookForceMagnitude: 3
   ConeAngleJitterDegrees: 6
   ConeSpinJitterMagnitude: 0.3
   WobbleForceMagnitude: 0
   WobbleFrequencyHz: 2
+  IsNuke: 0
+  NukeBlastRadius: 4
+  NukeExplosionForce: 14
+  NukeTweenDuration: 0.5
+  NukeLockOnPauseDuration: 0.6
+  NukeGreenZoneMin: 0.82
+  NukeGreenZoneMax: 0.85
