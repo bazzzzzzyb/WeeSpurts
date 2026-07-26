@@ -16,6 +16,15 @@ Unity/*.mdb.meta
 Unity/sysinfo.txt
 Unity/crashlytics-build.properties
 
+# --- Unity AI (Assistant / Generators) scratch ---
+# GeneratedAssets/ is the generator's local cache: every model+image it ever made,
+# including *_deleted/ folders for stuff you already threw away, plus .json sidecars
+# holding the prompt history. Megabytes of churn, none of it the project. The assets
+# you actually keep get imported into Assets/ — commit those, not the cache.
+Unity/GeneratedAssets/
+Unity/Assets/AI Toolkit/
+Unity/Assets/AI Toolkit.meta
+
 # --- Third-party asset packs kept OUT of git ---
 # Large Asset Store packs we're only trialling. Share via Drive, not the repo,
 # so we don't burn LFS quota or bloat history. Each dev imports them locally.
