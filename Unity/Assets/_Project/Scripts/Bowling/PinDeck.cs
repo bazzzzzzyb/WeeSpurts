@@ -39,9 +39,37 @@ namespace WeeSpurts.Bowling
                 {
                     Pin pin = Instantiate(pinTemplate, transform);
                     pin.gameObject.SetActive(true);
-                    Vector3 home = transform.position + offset;
+
+                    // + PinHeight * 0.5 BECAUSE A PIN'S ORIGIN IS ITS MIDDLE, NOT
+                    // ITS FOOT. The template is a Unity cylinder, whose pivot sits
+                    // at the centre of the mesh, and GreyboxSceneBuilder duly
+                    // offsets it by half a pin height when it builds it. This line
+                    // used to overwrite that with a bare lane-level position, so
+                    // every pin was spawned buried up to its waist in the lane and
+                    // then shoved back out by PhysX depenetration.
+                    //
+                    // That was survivable with one chunky box collider — pins
+                    // popped up 19cm on spawn and settled, and the only visible
+                    // cost was that IsStanding's 0.6m "displaced" budget was
+                    // permanently 19cm in the hole before a ball was even thrown.
+                    // It stopped being survivable the moment pins gained a 2.3cm
+                    // base pad: burying a thin collider eight times its own
+                    // thickness makes PhysX eject it hard, so pins launched, blew
+                    // past the displaced threshold, read as knocked, and got
+                    // hidden by ClearDeadWood — i.e. they vanished.
+                    //
+                    // THIS LINE AND Pin.BuildShapedCollider ARE A LOAD-BEARING
+                    // PAIR — QA flagged this coupling has no test tying it
+                    // together. Removing this offset while the shaped collider
+                    // (or any future thin base pad) is still in use silently
+                    // reintroduces "pins vanish on rack reset." If you ever see
+                    // that symptom again, check THIS line first.
+                    Vector3 home = transform.position + offset
+                                   + Vector3.up * (pinConfig.PinHeight * 0.5f);
                     pin.transform.position = home;
-                    pin.Configure(home, pinConfig.PinMass, pinConfig.KnockedAngleDegrees);
+                    pin.Configure(home, pinConfig.PinMass, pinConfig.KnockedAngleDegrees,
+                                  pinConfig.CenterOfMassHeight01, pinConfig.PinHeight,
+                                  pinConfig.UseShapedCollider, pinConfig.BaseDiameter01);
                     _pins.Add(pin);
                 }
             }

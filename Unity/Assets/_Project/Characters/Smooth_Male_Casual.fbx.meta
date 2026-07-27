@@ -34,6 +34,96 @@ ModelImporter:
       assembly: UnityEngine.CoreModule
       name: Socks
     second: {fileID: 2100000, guid: b3a8e51d84b8a40398d025ac8a37f63b, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Eyes
+    second: {fileID: 2100000, guid: 49d223f42c802408186321c1347d2784, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Hair
+    second: {fileID: 2100000, guid: 57cb59f1264084dc5aef492f5d5805b2, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Pants
+    second: {fileID: 2100000, guid: 311f4dfc134ed4088b35a918ae0a0d00, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Shirt
+    second: {fileID: 2100000, guid: 115decfe5044c4f939b51e23c64b9395, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Skin
+    second: {fileID: 2100000, guid: 5489fb2c7900b4a46aab0ec23a3f2822, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Smooth_Male_Casual_Eyes
+    second: {fileID: 2100000, guid: c38d8cb3d65e146378ca5fb793697a9d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Smooth_Male_Casual_Hair
+    second: {fileID: 2100000, guid: 2f46f63f05f4f4ec3b3148dcbaa7a4a6, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Smooth_Male_Casual_Pants
+    second: {fileID: 2100000, guid: 4dc0d8a2374fc4fef9a65e3faed8c69d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Smooth_Male_Casual_Shirt
+    second: {fileID: 2100000, guid: b77dd6359878440759e3735a97763385, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Smooth_Male_Casual_Skin
+    second: {fileID: 2100000, guid: 347900b0bd7934d248e597b9936c6364, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Smooth_Male_Casual_Socks
+    second: {fileID: 2100000, guid: 208e9bf85e45d400b8ac4e6152c6e79e, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Smooth_Male_Casual_Thrower_Eyes
+    second: {fileID: 2100000, guid: eef07e857d17c40f99ce46721f84ea7a, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Smooth_Male_Casual_Thrower_Hair
+    second: {fileID: 2100000, guid: 6e23dbb439cf64758b82b97a5a703efa, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Smooth_Male_Casual_Thrower_Pants
+    second: {fileID: 2100000, guid: a9ad8f4e0bc0c4d389486d033eb80cf2, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Smooth_Male_Casual_Thrower_Shirt
+    second: {fileID: 2100000, guid: f4830745e479a488a91be3d8179acfc1, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Smooth_Male_Casual_Thrower_Skin
+    second: {fileID: 2100000, guid: f6638e69fd6994839a29153a45877f48, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Smooth_Male_Casual_Thrower_Socks
+    second: {fileID: 2100000, guid: cefccf3fbc62144a9921705d63fe9a98, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Thrower_Socks
+    second: {fileID: 2100000, guid: d7ff5fb200a864087a32615146fbc8c2, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0

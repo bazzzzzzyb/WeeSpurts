@@ -56,6 +56,26 @@ namespace WeeSpurts.Bowling
             homePosition = transform.position;
         }
 
+        /// <summary>
+        /// Re-bakes "where the character stands at zero lateral aim".
+        ///
+        /// WHY THIS EXISTS: homePosition is captured ONCE, at scene-build time,
+        /// by Configure() above. That was correct while the thrower was a statue
+        /// that never left the foul line. Now that the player can walk away and
+        /// come back (PlayerAvatar.MoveToThrowingStance), a stale home would
+        /// yank them back to wherever the scene happened to be built the instant
+        /// they started aiming. PlayerAvatar calls this as part of the move.
+        /// </summary>
+        public void SetHome(Vector3 home)
+        {
+            homePosition = home;
+            // SmoothDamp owns _slideVelocity between calls. Carrying a velocity
+            // across a teleport would fling the character sideways from a
+            // stimulus that no longer applies — same reasoning as the reset in
+            // LateUpdate below, just triggered by a jump instead of an aim ending.
+            _slideVelocity = 0f;
+        }
+
         // LateUpdate, matching AimPreview: BallLauncher writes CurrentLateral in
         // its own Update, and Unity runs every Update before any LateUpdate, so
         // this always reads the CURRENT frame's aim rather than last frame's —

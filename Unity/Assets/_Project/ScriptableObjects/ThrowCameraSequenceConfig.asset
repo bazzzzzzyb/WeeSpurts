@@ -98,7 +98,7 @@ MonoBehaviour:
   BZoomHeight: 1
   BZoomLookAheadDistance: 9
   BZoomLookHeight: 0.2
-  DDuration: 0.8
+  DDuration: 1.3
   DCurve:
     serializedVersion: 2
     m_Curve:
@@ -124,7 +124,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   DHeight: 0.7
-  DDistanceDownLane: 1.4
+  DDistanceDownLane: 1.6
   DLateralOffset: 0
   DLookAheadDistance: 7
   DLookHeight: 0.3
