@@ -96,7 +96,7 @@ namespace WeeSpurts.Bowling
 
         public void SnapToAimView()
         {
-            // Deliberately does NOT clear _sequenceActive. BowlingGameController
+            // Deliberately does NOT clear _sequenceActive. BowlingMatchFlow
             // calls this at the start of every roll, and a scripted camera move
             // wants to EASE back to the aim framing from wherever it is — if this
             // stole the camera back, every new roll would snap the shot out from
@@ -197,7 +197,7 @@ namespace WeeSpurts.Bowling
                 // Unity runs every Update() before any LateUpdate(), so this is
                 // always the CURRENT frame's pose — no execution-order tweaking.
                 // Re-applying _basePosition here (rather than trusting the value
-                // SetSequenceFraming wrote) matters because BowlingGameController
+                // SetSequenceFraming wrote) matters because BowlingMatchFlow
                 // may call SnapToAimView from a coroutine in between, which runs
                 // after Update but before LateUpdate.
                 _basePosition = _sequencePosition;

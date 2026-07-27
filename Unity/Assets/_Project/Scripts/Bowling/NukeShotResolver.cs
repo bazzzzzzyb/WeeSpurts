@@ -17,7 +17,7 @@ namespace WeeSpurts.Bowling
     /// SETUP: sits on a "NukeShot" GameObject. GreyboxSceneBuilder creates the
     /// nuke sphere + poof ParticleSystem and wires them in; only these two
     /// references are editor-wired, everything else this needs comes in as
-    /// method parameters from BowlingGameController to keep the wiring surface
+    /// method parameters from BowlingPresentation to keep the wiring surface
     /// small.
     /// </summary>
     public class NukeShotResolver : MonoBehaviour
@@ -28,16 +28,17 @@ namespace WeeSpurts.Bowling
         /// <summary>
         /// Defensive cleanup: forces the nuke sphere hidden, the ball visible, and
         /// any in-progress/lingering poof cleared immediately. Called at the start
-        /// of every new roll (BowlingGameController.BeginRoll) so an interrupted
+        /// of every new roll (BowlingMatchFlow.BeginRoll) so an interrupted
         /// nuke sequence — e.g. the sandbox F-key frame-reset firing mid-tween —
         /// never leaves stale visual state bleeding into the next roll.
         ///
         /// Why F-key mid-tween needs this: ResetCurrentFrame() calls
-        /// StopAllCoroutines() on BowlingGameController. PlayHitSequence/
+        /// StopAllCoroutines() on BowlingMatchFlow. PlayHitSequence/
         /// PlayMissSequence are never started with their OWN StartCoroutine call —
-        /// ResolveNukeThrow reaches them via `yield return nukeResolver.PlayHitSequence(...)`,
-        /// which just nests their enumeration inside the SAME coroutine
-        /// BowlingGameController started for ResolveThrow. So StopAllCoroutines()
+        /// ResolveNukeThrow reaches them via `yield return
+        /// _presentation.PlayNukeHitSequence(...)`, which hands back this very
+        /// enumerator and nests it inside the SAME coroutine
+        /// BowlingMatchFlow started for ResolveThrow. So StopAllCoroutines()
         /// aborts them too, wherever they happened to be (sphere mid-tween, ball
         /// hidden, poof mid-play) — hence needing a hard reset here, not just relying
         /// on the sequences to finish and clean up after themselves.

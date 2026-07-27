@@ -76,7 +76,7 @@ namespace WeeSpurts.Bowling
         [SerializeField] private BallLauncher launcher;
 
         [Tooltip("Read-only: used for whose turn it is (beat A plays only on a NEW player's turn) and whether the active ball is a Nuke.")]
-        [SerializeField] private BowlingGameController game;
+        [SerializeField] private BowlingMatchFlow game;
 
         [Tooltip("Read-only: the ball's position drives beats E and F, and its OnSettled event ends the move.")]
         [SerializeField] private BowlingBall ball;
@@ -245,7 +245,7 @@ namespace WeeSpurts.Bowling
             //     of step, so ease back to the aim framing.
             //
             //     The case that actually causes this: pressing the sandbox F key
-            //     WHILE holding SPACE. BowlingGameController.ResetCurrentFrame ->
+            //     WHILE holding SPACE. BowlingMatchFlow.ResetCurrentFrame ->
             //     BeginRoll -> launcher.BeginAim() clears ChargingPower but leaves
             //     IsAiming already true, so NEITHER of the rising edges above
             //     fires and the camera would stay pushed in on the thrower for
@@ -274,7 +274,7 @@ namespace WeeSpurts.Bowling
             beat == Beat.YoureUp || beat == Beat.TakeStance || beat == Beat.TakeStanceHold;
 
         /// <summary>
-        /// A roll is beginning (BowlingGameController.BeginRoll called
+        /// A roll is beginning (BowlingMatchFlow.BeginRoll called
         /// launcher.BeginAim()). Ease from wherever the camera is — the pin deck
         /// after an impact, a half-finished beat after an F-key reset, the Nuke's
         /// framing after a powerup throw — back to the start of the move. Never a

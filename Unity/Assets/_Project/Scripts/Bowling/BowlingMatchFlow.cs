@@ -1,24 +1,42 @@
+using System;
 using System.Collections;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using WeeSpurts.Gameplay;
-using WeeSpurts.Player;
 
 namespace WeeSpurts.Bowling
 {
     /// <summary>
-    /// The conductor for a single-machine ("hot-seat") bowling match.
-    /// Owns the loop: set rack → aim → throw → settle → count → score → next.
+    /// THE MATCH ITSELF: whose turn it is, what is on the rack, what a throw
+    /// resolved to, and what the score is. Owns the loop — set rack → aim →
+    /// throw → settle → count → score → next — and is the ONLY thing that knows
+    /// the order of operations.
     ///
-    /// Everything flows through small, separated pieces (launcher makes
-    /// parameters, ball simulates, deck counts, scorer scores) — the same
-    /// pieces the networked version will reuse with a network layer between
-    /// launcher and ball. This class is the ONLY thing that knows the order
-    /// of operations.
+    /// WHY THIS IS SPLIT FROM <see cref="BowlingPresentation"/> (read before
+    /// moving anything between the two): this game is online-only, and
+    /// Docs/Networking.md is host-authoritative. Under Mirror, THIS class is the
+    /// half that must run on the host and be trusted — turn order, pin counts,
+    /// scores — while cameras, reaction animations, keyboard shortcuts and the
+    /// nuke's fireworks run on every machine locally. Splitting them while there
+    /// is no networking code yet is enormously cheaper than unpicking one
+    /// 500-line class after Mirror has started serializing it.
     ///
-    /// SETUP: GreyboxSceneBuilder creates and wires everything.
+    /// THE RULE THAT KEEPS THE SPLIT HONEST: this class never references a
+    /// camera, an animation, a HUD or a key press. When the match flow needs
+    /// something to be SHOWN, it calls a hook on <see cref="BowlingPresentation"/>
+    /// (a sibling component on the same GameObject) and carries on. Nothing in
+    /// here reads back from presentation except one tuning number, and nothing in
+    /// here knows what a PlayerAvatar is.
+    ///
+    /// Everything still flows through small, separated pieces (launcher makes
+    /// parameters, ball simulates, deck counts, scorer scores) — the same pieces
+    /// the networked version will reuse with a network layer between launcher
+    /// and ball.
+    ///
+    /// SETUP: sits on the "BowlingGame" GameObject next to BowlingPresentation.
+    /// GreyboxSceneBuilder creates and wires both.
     /// </summary>
-    public class BowlingGameController : MonoBehaviour
+    [RequireComponent(typeof(BowlingPresentation))]
+    public class BowlingMatchFlow : MonoBehaviour
     {
         [Header("Wired by GreyboxSceneBuilder")]
         [SerializeField] private BallConfig ballConfig;
@@ -26,28 +44,15 @@ namespace WeeSpurts.Bowling
         [SerializeField] private BowlingBall ball;
         [SerializeField] private PinDeck pinDeck;
         [SerializeField] private BallLauncher launcher;
-        [SerializeField] private ThrowCamera throwCamera;
         [SerializeField] private Transform ballSpawn;
 
-        [Tooltip("Optional. Any MonoBehaviour implementing IThrowReactionActor — the greybox capsule now, a real rig later. Drag any matching component in; leave empty to skip (e.g. scenes with no thrower actor yet).")]
-        [SerializeField] private MonoBehaviour throwReactionBehaviour;
-        private IThrowReactionActor _throwReaction;
-
-        [Tooltip("Optional. Presentation layer for the Nuke Shot powerup. Leave empty in scenes that don't have one yet — a Nuke BallConfig just won't resolve until this is wired.")]
-        [SerializeField] private NukeShotResolver nukeResolver;
-
-        [Header("Match start (control modes)")]
-        [Tooltip("SANDBOX FEEL-TESTING PATH: start the match the instant the scene loads, so you can throw immediately without walking to a lane kiosk first. DEFAULT TRUE so every existing scene behaves exactly as it did before roaming existed. RoamingSetupTool switches it OFF in the walkable venue scene, where the match is meant to start diegetically.")]
-        [SerializeField] private bool sandboxAutoStart = true;
-
-        [Tooltip("Optional. Where the active thrower stands at the foul line — the avatar is snapped here on their turn. Empty just means the avatar changes mode without being moved.")]
-        [SerializeField] private Transform throwingStance;
-
-        [Tooltip("Optional. Which avatar sandboxAutoStart hands the first turn to. Leave empty in scenes with no PlayerAvatar (e.g. BowlingAlley.unity) — the match then starts with nobody's mode touched, exactly as before.")]
-        [SerializeField] private PlayerAvatar sandboxThrower;
-
-        [Tooltip("Seconds of ←/→ steering lockout at the START of a player's turn, while the 'you're up' camera beat is looking BACK at the thrower and left/right therefore read mirrored ON SCREEN. DEFAULT 0 = off, i.e. steer immediately and live with the mirrored window. Set it to ThrowCameraSequenceConfig's ReturnDuration + ADuration (0.75 + 0.9 = 1.65 at the tuned defaults) to suppress steering until the shot swings down-lane, or 2.45 to also cover the swing itself. Power and spin are never locked. NOTE: this is unrelated to a NEGATIVE HalfLaneWidth, which inverts aim permanently — see HalfLaneWidth.")]
-        [SerializeField] private float turnStartSteeringLockSeconds = 0f;
+        // The local presentation half. Same sibling-component pattern
+        // BallConfigSwitcher/BallLauncher already use to reach this class:
+        // both live on the "BowlingGame" GameObject, so neither needs wiring.
+        // Fetched in Awake (never Start) because Unity gives NO ordering
+        // guarantee between two components' Start methods — by the time either
+        // side's Start runs, both cross-references must already be valid.
+        private BowlingPresentation _presentation;
 
         private float _defaultGreenZoneMin;
         private float _defaultGreenZoneMax;
@@ -57,11 +62,11 @@ namespace WeeSpurts.Bowling
         // (it doesn't). Deliberately mirrors ThrowCameraSequence's own
         // _lastTurnPlayer rather than reading it — the camera stays a
         // presentation layer that nothing in the throw path depends on.
+        //
+        // Lives HERE and not on the presentation half despite feeding a camera
+        // beat: it is turn IDENTITY bookkeeping, which is match-flow's job. Only
+        // the lockout's DURATION comes from presentation (see BeginRoll).
         private PlayerData _lastAimTurnPlayer;
-
-        // Whoever is currently at the line. Stored so the match can hand control
-        // back to them (EnterRoaming) when it ends.
-        private PlayerAvatar _thrower;
 
         public TurnManager Turns { get; private set; }
         public BallLauncher Launcher => launcher;
@@ -75,29 +80,33 @@ namespace WeeSpurts.Bowling
         /// </summary>
         public bool MatchInProgress { get; private set; }
 
-        /// <summary>
-        /// Should the bowling HUD be on screen at all? False while roaming: the
-        /// scorecard, phase banner and control hints are match furniture, and
-        /// leaving them up while you walk around the alley reads as UI debris
-        /// rather than as a game that hasn't started (Tony's call).
-        ///
-        /// Deliberately NOT just MatchInProgress — that goes false the instant
-        /// the match completes, which would yank the final scores off screen at
-        /// exactly the moment everyone wants to read them. MatchOver keeps them
-        /// up until R reloads the scene.
-        /// </summary>
-        public bool HudVisible => MatchInProgress || MatchOver;
-
         /// <summary>Human-readable phase for the debug HUD.</summary>
         public string Phase { get; private set; } = "Starting";
 
+        /// <summary>
+        /// Fired once the match state has fully finished (MatchOver set,
+        /// MatchInProgress cleared, Phase updated).
+        ///
+        /// This exists so the match can END without this class knowing that
+        /// players have avatars, cameras or control modes: BowlingPresentation
+        /// subscribes and hands the thrower back to roaming. Under Mirror the
+        /// same shape holds — the host decides the match is over, and each
+        /// machine reacts locally.
+        /// </summary>
+        public event Action OnMatchComplete;
+
         private bool _ballSettled;
 
+        private void Awake()
+        {
+            _presentation = GetComponent<BowlingPresentation>();
+        }
+
         public void Configure(BallConfig ballCfg, LaneConfig laneCfg, BowlingBall b,
-                              PinDeck deck, BallLauncher l, ThrowCamera cam, Transform spawn)
+                              PinDeck deck, BallLauncher l, Transform spawn)
         {
             ballConfig = ballCfg; laneConfig = laneCfg; ball = b;
-            pinDeck = deck; launcher = l; throwCamera = cam; ballSpawn = spawn;
+            pinDeck = deck; launcher = l; ballSpawn = spawn;
         }
 
         /// <summary>The ball config the NEXT throw will use. Read by the debug HUD.</summary>
@@ -203,40 +212,19 @@ namespace WeeSpurts.Bowling
                 ballConfig.IsNuke ? ballConfig.NukeGreenZoneMax : _defaultGreenZoneMax);
         }
 
-        /// <summary>Wires the optional thrower reaction actor (GreyboxSceneBuilder pattern, same as SetBallConfig).</summary>
-        public void SetThrowReactionActor(MonoBehaviour actor) => throwReactionBehaviour = actor;
-
-        /// <summary>Wires the optional Nuke Shot presentation layer (same pattern as SetThrowReactionActor).</summary>
-        public void SetNukeResolver(NukeShotResolver resolver) => nukeResolver = resolver;
-
-        private void Start()
-        {
-            Initialize();
-
-            // Split in two so that a walkable-alley scene can wire everything up
-            // at load and only actually START the match when a player walks up
-            // to the lane (Docs/OpenQuestions.md — game start is diegetic, not a
-            // menu button). Step 2 of that plan builds the interaction; this is
-            // just the seam it will call into.
-            if (sandboxAutoStart) StartMatch(sandboxThrower);
-        }
-
         /// <summary>
         /// Everything that has to exist before a match can start: players,
         /// cached green zone, event subscriptions. Runs on scene load whether or
         /// not anyone is bowling yet.
+        ///
+        /// Called by BowlingPresentation.Start, because that is where the
+        /// sandbox auto-start lives and the two must happen in that order.
         /// </summary>
-        private void Initialize()
+        public void Initialize()
         {
             Turns = new TurnManager();
             for (int i = 0; i < laneConfig.DebugPlayerCount; i++)
                 Turns.AddPlayer(new PlayerData((ulong)i, $"Player {i + 1}"));
-
-            // Unity can't serialize an interface field directly, so
-            // throwReactionBehaviour is serialized as a MonoBehaviour and
-            // cast here. "as" on a null reference just yields null, so an
-            // unassigned slot safely resolves to no-op via the ?. below.
-            _throwReaction = throwReactionBehaviour as IThrowReactionActor;
 
             // Cache the normal green zone BEFORE anything (a Nuke throw) might
             // override it via launcher.SetGreenZone, so a Nuke roll can restore
@@ -250,12 +238,15 @@ namespace WeeSpurts.Bowling
         }
 
         /// <summary>
-        /// Begin a match, optionally taking control of an avatar and putting
-        /// them at the line. Public because the walkable alley starts matches
-        /// from outside (a player walking up to the lane); the sandbox path
-        /// calls it from Start.
+        /// Begin a match. Public because the walkable alley starts matches from
+        /// outside (a player walking up to the lane); the sandbox path starts it
+        /// on scene load.
+        ///
+        /// Takes NO avatar: putting a player at the line is a local presentation
+        /// concern, so BowlingPresentation.StartMatch does that half and then
+        /// calls this. Under Mirror this becomes the host-side half.
         /// </summary>
-        public void StartMatch(PlayerAvatar thrower)
+        public void StartMatch()
         {
             if (Turns == null)
             {
@@ -269,12 +260,6 @@ namespace WeeSpurts.Bowling
             if (MatchInProgress) return;
             MatchInProgress = true;
 
-            _thrower = thrower;
-            // The avatar owns its own mode — we ask, we don't reach in and flip
-            // components ourselves (see PlayerAvatar's class comment). Null is
-            // fine: scenes with no avatar just start the match as they always did.
-            if (_thrower != null) _thrower.EnterBowling(throwingStance);
-
             Turns.StartMatch();
             BeginRoll();
         }
@@ -285,34 +270,19 @@ namespace WeeSpurts.Bowling
             MatchInProgress = false;
             Phase = "Match over — press R to rematch";
 
-            // Give the player their legs back rather than leaving them stranded
-            // at the foul line with no camera control. R still reloads the scene
-            // for a rematch, exactly as before.
-            if (_thrower != null) _thrower.EnterRoaming();
+            // Presentation gives the player their legs back (EnterRoaming) —
+            // this class does not know avatars exist. Raised LAST so every
+            // subscriber sees fully-settled match state.
+            OnMatchComplete?.Invoke();
         }
 
-        private void Update()
-        {
-            // Rematch: reloading the scene is the simplest reliable reset —
-            // every object comes back in a known-good state.
-            if (MatchOver && Input.GetKeyDown(KeyCode.R))
-                SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-
-            // Sandbox: quick-reset just the CURRENT frame (re-rack, same
-            // player, same frame) without ending the match. For retrying one
-            // throw setup — e.g. bounce/spin feel-testing — without playing
-            // back through pin counting each time. Not available once the
-            // match is over; R already covers a full restart there.
-            //
-            // MatchInProgress is also required now that a match no longer always
-            // auto-starts: without it, tapping F while walking around the venue
-            // would call BeginRoll and open an aim phase behind your back, with
-            // nobody at the line.
-            if (!MatchOver && MatchInProgress && Input.GetKeyDown(KeyCode.F))
-                ResetCurrentFrame();
-        }
-
-        private void ResetCurrentFrame()
+        /// <summary>
+        /// Sandbox quick-reset of the CURRENT frame: re-rack, same player, same
+        /// frame, without ending the match. Public because the F key that
+        /// triggers it is local input, and local input lives in
+        /// BowlingPresentation.
+        /// </summary>
+        public void ResetCurrentFrame()
         {
             // Cancel any throw still resolving so it can't fight the reset;
             // ball.ResetForThrow below independently clears its in-flight state.
@@ -329,8 +299,8 @@ namespace WeeSpurts.Bowling
             // (normal frame progression, turn-end-then-next-player, AND the F-key
             // sandbox reset) with one call, so an interrupted nuke sequence never
             // leaves stale visual state (stuck sphere/looping poof) bleeding into
-            // this roll. No-ops via ?. in scenes with no NukeShotResolver wired.
-            nukeResolver?.ResetVisualState(ball);
+            // this roll. No-ops in scenes with no NukeShotResolver wired.
+            _presentation.ResetNukeVisualState(ball);
 
             BowlingScorer scorer = Turns.CurrentPlayer.Scorer;
 
@@ -341,7 +311,7 @@ namespace WeeSpurts.Bowling
 
             pinDeck.MarkRollStart();
             ball.ResetForThrow(ballSpawn.position);
-            throwCamera.SnapToAimView();
+            _presentation.SnapCameraToAimView();
 
             ApplyGreenZoneForActiveBall();
 
@@ -356,11 +326,15 @@ namespace WeeSpurts.Bowling
             // ReferenceEquals, not ==: we care whether it is literally the same
             // PlayerData object, matching how ThrowCameraSequence decides the
             // same thing. The two must agree or the lockout covers the wrong roll.
+            //
+            // The DURATION comes from presentation (it is a camera-timing knob,
+            // tuned against the camera beats); the "is this a new turn" decision
+            // stays here, where turn identity lives.
             PlayerData current = Turns.CurrentPlayer;
             bool newTurn = !ReferenceEquals(current, _lastAimTurnPlayer);
             _lastAimTurnPlayer = current;
 
-            launcher.BeginAim(newTurn ? turnStartSteeringLockSeconds : 0f);
+            launcher.BeginAim(newTurn ? _presentation.SteeringLockSecondsForNewTurn : 0f);
 
             Phase = $"{Turns.CurrentPlayer.DisplayName} — frame {scorer.CurrentFrame + 1}, roll {scorer.RollInFrame + 1}: AIM";
         }
@@ -386,10 +360,11 @@ namespace WeeSpurts.Bowling
 
             _ballSettled = false;
             ball.Launch(p, ballConfig);
-            // Body English: the thrower's pose reacts the instant the ball
-            // leaves, not after it settles/pins are counted. Purely cosmetic.
-            _throwReaction?.PlayReaction(p);
-            throwCamera.FollowBall();
+            // Body English + camera handoff: the thrower's pose reacts and the
+            // camera picks the ball up the instant it leaves, not after it
+            // settles/pins are counted. Purely cosmetic, hence one presentation
+            // call rather than two direct ones.
+            _presentation.OnThrowLaunched(p);
 
             while (!_ballSettled)
                 yield return null;
@@ -420,26 +395,27 @@ namespace WeeSpurts.Bowling
 
         /// <summary>
         /// Nuke Shot (GameBible §9 — powerups are a sanctioned exception to
-        /// §8's realism rule): green-or-not is known at release from the SAME
-        /// TimingError01 signal a normal throw already computes (0 = inside
-        /// the zone). The up/lock/down movement is a pure Transform tween
-        /// (NukeShotResolver); the explosion still runs real physics
-        /// (pinDeck.ApplyExplosion) so pins visibly fly, but a green hit is a
-        /// GUARANTEED full clear by design — the scored outcome reads
-        /// Scorer.PinsStanding directly, not CountKnockedThisRoll. The
-        /// explosion is pure spectacle for a hit; CountKnockedThisRoll is
-        /// still used for a normal throw's outcome (see ResolveThrow above).
+        /// §8's realism rule): green-or-not is known at release from
+        /// LaunchParameters.IsGreen, the same green-zone signal a normal
+        /// throw's TimingError01 already computes (0 = inside the zone). The
+        /// up/lock/down movement is a pure Transform tween (NukeShotResolver,
+        /// reached through the presentation half); the explosion still runs real
+        /// physics (pinDeck.ApplyExplosion) so pins visibly fly, but a green hit
+        /// is a GUARANTEED full clear by design — the scored outcome reads
+        /// Scorer.PinsStanding directly, not CountKnockedThisRoll. The explosion
+        /// is pure spectacle for a hit; CountKnockedThisRoll is still used for a
+        /// normal throw's outcome (see ResolveThrow above).
         /// </summary>
         private IEnumerator ResolveNukeThrow(LaunchParameters p)
         {
-            bool isGreen = p.TimingError01 == 0f;
+            bool isGreen = p.IsGreen;
             Vector3 spawnPos = ballSpawn.position + Vector3.right * (p.LateralPosition01 * HalfLaneWidth);
             int knocked;
 
             if (isGreen)
             {
                 Vector3 pinCenter = pinDeck.transform.position;
-                yield return nukeResolver.PlayHitSequence(ballConfig, spawnPos, pinCenter, pinDeck, ball, throwCamera);
+                yield return _presentation.PlayNukeHitSequence(ballConfig, spawnPos, pinCenter, pinDeck, ball);
                 // Bigger blast (see BallConfig Nuke tunables) deserves a beat longer
                 // than the normal throw's settle wait so the spectacle actually reads
                 // before phase/UI moves on — this is NOT waiting for physics to
@@ -460,7 +436,7 @@ namespace WeeSpurts.Bowling
             }
             else
             {
-                yield return nukeResolver.PlayMissSequence(ballConfig, spawnPos, ball, throwCamera);
+                yield return _presentation.PlayNukeMissSequence(ballConfig, spawnPos, ball);
                 knocked = 0;
             }
 

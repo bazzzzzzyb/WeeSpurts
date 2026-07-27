@@ -26,10 +26,10 @@ namespace WeeSpurts.UI
     /// back through SetSpin, so the launcher stays the single source of truth
     /// and the throw can never disagree with the dot.
     ///
-    /// SETUP: same GameObject as BowlingGameController (GreyboxSceneBuilder
+    /// SETUP: same GameObject as BowlingMatchFlow (GreyboxSceneBuilder
     /// adds it, alongside DebugHud).
     /// </summary>
-    [RequireComponent(typeof(BowlingGameController))]
+    [RequireComponent(typeof(BowlingMatchFlow))]
     public class SpinSelectorHud : MonoBehaviour
     {
         [Tooltip("Diameter of the spin ball on screen, in pixels.")]
@@ -41,7 +41,10 @@ namespace WeeSpurts.UI
         [Tooltip("Distance from the bottom-left corner of the screen, in pixels.")]
         [SerializeField] private Vector2 screenMargin = new Vector2(20f, 20f);
 
-        private BowlingGameController _game;
+        // Only ever used to reach the launcher (which owns the spin value); the
+        // launcher itself folds the input gate into CanEditSpin, so this widget
+        // needs no presentation reference of its own.
+        private BowlingMatchFlow _game;
 
         // Built once, lazily, because OnGUI has no other sane place to make a
         // texture and a 64px disc is not worth an asset file.
@@ -53,7 +56,7 @@ namespace WeeSpurts.UI
         // scorecard would leave the dot stuck to the cursor.
         private bool _dragging;
 
-        private void Awake() => _game = GetComponent<BowlingGameController>();
+        private void Awake() => _game = GetComponent<BowlingMatchFlow>();
 
         private void OnDestroy()
         {

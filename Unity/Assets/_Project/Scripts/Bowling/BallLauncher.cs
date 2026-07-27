@@ -21,10 +21,23 @@ namespace WeeSpurts.Bowling
     /// Active Input Handling must be "Both" (PLAYBOOK Stage B covers this).
     /// Controller support arrives with the real UI pass (Roadmap [5]).
     /// </summary>
+    [RequireComponent(typeof(BowlingPresentation))]
     public class BallLauncher : MonoBehaviour
     {
-        /// <summary>The finished throw. BowlingGameController listens.</summary>
+        /// <summary>The finished throw. BowlingMatchFlow listens.</summary>
         public event Action<LaunchParameters> OnThrow;
+
+        // Same sibling reference pattern as BallConfigSwitcher/SpinSelectorHud/
+        // DebugHud: this component sits on the same GameObject as the bowling
+        // game, so it can ask "is this MY avatar's turn" before touching any
+        // Input this frame. The PRESENTATION half, not the match flow, because
+        // "whose keyboard is this" is a per-machine question — see
+        // BowlingPresentation.ThrowInputAllowed. Once Mirror lands, every client
+        // runs this same MonoBehaviour, and without this gate another player's
+        // keyboard could drive YOUR throw.
+        private BowlingPresentation _presentation;
+
+        private void Awake() => _presentation = GetComponent<BowlingPresentation>();
 
         [Tooltip("How fast the aim slides across the lane, in half-lanes per second.")]
         [SerializeField] private float aimSpeed = 1.2f;
@@ -63,7 +76,7 @@ namespace WeeSpurts.Bowling
         /// load-bearing, do not "fix" it by turning the camera round).
         ///
         /// But a camera looking back at you MIRRORS left and right on screen,
-        /// and BowlingGameController calls BeginAim() at the START of the roll —
+        /// and BowlingMatchFlow calls BeginAim() at the START of the roll —
         /// so for the ~1.6s that beat holds, steering left visibly moves you
         /// right. Every report of "the controls are backwards" is this window.
         ///
@@ -101,8 +114,14 @@ namespace WeeSpurts.Bowling
         /// Once SPACE is held the throw is committed to whatever was dialled, so
         /// the player watches the meter instead of fiddling with two things at
         /// once. SpinSelectorHud reads this to grey the widget out.
+        ///
+        /// Also folds in BowlingPresentation.ThrowInputAllowed, so the widget
+        /// visually reads as locked (and SetSpin below actually refuses writes)
+        /// whenever it isn't this avatar's turn — not just during the POWER
+        /// phase. SpinSelectorHud never needed to change: it already reads this
+        /// property and CurrentSpin rather than touching Input itself.
         /// </summary>
-        public bool CanEditSpin => IsAiming && !ChargingPower;
+        public bool CanEditSpin => IsAiming && !ChargingPower && _presentation.ThrowInputAllowed;
 
         /// <summary>
         /// Sets spin absolutely, clamped into the unit circle. This is how the
@@ -139,7 +158,7 @@ namespace WeeSpurts.Bowling
         /// <summary>
         /// Overrides the green zone for the NEXT release — same
         /// ComputeTimingError computation underneath, just parameterized.
-        /// Lets BowlingGameController push a tighter zone for a powerup ball
+        /// Lets BowlingMatchFlow push a tighter zone for a powerup ball
         /// (e.g. Nuke Shot) without adding a second timing signal.
         /// </summary>
         public void SetGreenZone(float min, float max)
@@ -150,7 +169,11 @@ namespace WeeSpurts.Bowling
 
         private void Update()
         {
-            if (!IsAiming) return;
+            // Whole state machine no-ops instantly when it isn't this avatar's
+            // turn — see BowlingPresentation.ThrowInputAllowed. Combined with
+            // IsAiming in one early-out so neither check alone can let a stray
+            // frame of input through.
+            if (!IsAiming || !_presentation.ThrowInputAllowed) return;
 
             // Tick the steering lockout down. Counted here rather than from a
             // Time.time stamp so that pausing (Time.timeScale = 0) pauses it too.
@@ -185,6 +208,10 @@ namespace WeeSpurts.Bowling
                 {
                     IsAiming = false;
 
+                    // Computed once and reused below so TimingError01 and IsGreen
+                    // can never disagree about what "inside the zone" means.
+                    float timingError = ComputeTimingError(CurrentPower);
+
                     var p = new LaunchParameters
                     {
                         LateralPosition01 = CurrentLateral,
@@ -194,11 +221,15 @@ namespace WeeSpurts.Bowling
                         // Seed picked at throw time; later this exact value is
                         // what every networked client uses to replay chaos.
                         Seed = UnityEngine.Random.Range(int.MinValue, int.MaxValue),
-                        TimingError01 = ComputeTimingError(CurrentPower),
+                        TimingError01 = timingError,
                         // Hand-placed gag archetype at the extreme low end of the
                         // meter, deliberately NOT derived from TimingError01's
                         // smooth curve — see LaunchParameters.IsBackwardFumble.
-                        IsBackwardFumble = CurrentPower < backwardFumbleThreshold
+                        IsBackwardFumble = CurrentPower < backwardFumbleThreshold,
+                        // ComputeTimingError returns exactly 0f for the flat
+                        // "perfect" plateau inside the zone (see its own doc
+                        // comment) — same definition as before, just named.
+                        IsGreen = timingError == 0f
                     };
                     OnThrow?.Invoke(p);
                 }

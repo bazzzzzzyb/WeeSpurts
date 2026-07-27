@@ -9,7 +9,7 @@ namespace WeeSpurts.Bowling
     /// aim-phase line) both need to know how a given spin curves the ball. If
     /// each worked it out for itself they would quietly drift apart and the
     /// preview would start lying — exactly the failure that
-    /// BowlingGameController.HalfLaneWidth already exists to prevent for the
+    /// BowlingMatchFlow.HalfLaneWidth already exists to prevent for the
     /// lateral start position. Same trick, applied to the curve.
     ///
     /// Everything here is a pure function of floats: no Unity objects, no

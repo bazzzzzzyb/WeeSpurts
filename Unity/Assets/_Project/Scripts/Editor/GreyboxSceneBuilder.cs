@@ -186,7 +186,7 @@ namespace WeeSpurts.Editor
             // builds; falls back to the original greybox capsule if that prefab
             // hasn't been generated yet, so a fresh clone still builds a working
             // scene. Both implement IThrowReactionActor, so everything
-            // downstream (BowlingGameController) is identical either way.
+            // downstream (BowlingPresentation) is identical either way.
             //
             // The character's origin is at its FEET, unlike the capsule (origin
             // at its middle), so the two need different Y — hence the separate
@@ -227,7 +227,7 @@ namespace WeeSpurts.Editor
                 throwReaction = throwerGo.GetComponent<CharacterThrowReactionActor>();
                 // A prefab generated before this component existed — or one where
                 // the component ended up on the model child instead of the wrapper
-                // root — returns null here, and BowlingGameController's null-safe
+                // root — returns null here, and BowlingPresentation's null-safe
                 // `_throwReaction?.PlayReaction(p)` would then swallow it silently:
                 // no error, the thrower just never reacts again. Say so out loud.
                 if (throwReaction == null)
@@ -292,11 +292,25 @@ namespace WeeSpurts.Editor
             managers.AddComponent<SceneLoader>();
             managers.AddComponent<AudioManager>();
 
+            // The bowling game is TWO components on one object: BowlingMatchFlow
+            // (authoritative match state — turns, pins, scores) and
+            // BowlingPresentation (this machine's cameras, reactions and keys).
+            // Read either class's comment for why; the short version is that
+            // Mirror needs those two halves separable.
+            //
+            // GetOrAdd, not AddComponent, and that is load-bearing: all three of
+            // these carry [RequireComponent] pointing at each other, so adding
+            // any ONE of them makes Unity add the other two automatically. A
+            // plain AddComponent for the second and third would then stack a
+            // DUPLICATE component on the object, and two BowlingPresentations
+            // both running Update would fight over the same match.
             GameObject gameGo = new GameObject("BowlingGame");
-            BallLauncher launcher = gameGo.AddComponent<BallLauncher>();
-            BowlingGameController controller = gameGo.AddComponent<BowlingGameController>();
-            controller.Configure(ballConfig, laneConfig, ball, deck, launcher, throwCam, spawn.transform);
-            controller.SetThrowReactionActor(throwReaction);
+            BallLauncher launcher = GetOrAdd<BallLauncher>(gameGo);
+            BowlingMatchFlow matchFlow = GetOrAdd<BowlingMatchFlow>(gameGo);
+            BowlingPresentation presentation = GetOrAdd<BowlingPresentation>(gameGo);
+            matchFlow.Configure(ballConfig, laneConfig, ball, deck, launcher, spawn.transform);
+            presentation.Configure(throwCam);
+            presentation.SetThrowReactionActor(throwReaction);
 
             // Sandbox aim-phase preview: slides the ball to match live aim
             // input and draws a curved LineRenderer for direction + spin.
@@ -313,16 +327,16 @@ namespace WeeSpurts.Editor
             aimLine.startWidth = 0.03f;
             aimLine.endWidth = 0.015f;
             AimPreview aimPreview = ballGo.AddComponent<AimPreview>();
-            aimPreview.Configure(launcher, controller, aimLine);
+            aimPreview.Configure(launcher, matchFlow, aimLine);
             EditorUtility.SetDirty(aimPreview);
 
             // Thrower slides with the aim. Attached here rather than up in
-            // section 8b because it needs the launcher and controller, which
+            // section 8b because it needs the launcher and match flow, which
             // don't exist until this section. Reads HalfLaneWidth off the same
-            // controller AimPreview just got, so character, preview and resolved
+            // match flow AimPreview just got, so character, preview and resolved
             // throw are all bound to one number.
             ThrowerAimSlide aimSlide = throwerObject.AddComponent<ThrowerAimSlide>();
-            aimSlide.Configure(launcher, controller);
+            aimSlide.Configure(launcher, matchFlow);
             EditorUtility.SetDirty(aimSlide);
 
             // Sandbox ball switcher (press 1-9 in Play mode). A rebuild always
@@ -438,7 +452,7 @@ namespace WeeSpurts.Editor
             nukeResolverSO.FindProperty("nukeSphere").objectReferenceValue = nukeSphereGo.transform;
             nukeResolverSO.FindProperty("poofEffect").objectReferenceValue = nukePoof;
             nukeResolverSO.ApplyModifiedPropertiesWithoutUndo();
-            controller.SetNukeResolver(nukeResolver);
+            presentation.SetNukeResolver(nukeResolver);
             EditorUtility.SetDirty(nukeResolver);
 
             // ----- 10b. Scripted throw camera (the seven-beat cinematic move) -----
@@ -466,7 +480,9 @@ namespace WeeSpurts.Editor
             var sequenceSO = new SerializedObject(throwCamSequence);
             sequenceSO.FindProperty("config").objectReferenceValue = sequenceConfig;
             sequenceSO.FindProperty("launcher").objectReferenceValue = launcher;
-            sequenceSO.FindProperty("game").objectReferenceValue = controller;
+            // The MATCH half: the sequence only asks whose turn it is, where the
+            // ball spawns and whether the active ball is a Nuke.
+            sequenceSO.FindProperty("game").objectReferenceValue = matchFlow;
             sequenceSO.FindProperty("ball").objectReferenceValue = ball;
             sequenceSO.FindProperty("pinDeck").objectReferenceValue = deckGo.transform;
             sequenceSO.FindProperty("thrower").objectReferenceValue = throwerCameraAnchor;
@@ -475,12 +491,13 @@ namespace WeeSpurts.Editor
             sequenceSO.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(throwCamSequence);
 
-            gameGo.AddComponent<DebugHud>();
+            GetOrAdd<DebugHud>(gameGo);
             // The 2D spin selector (replaces the old Q/E spin keys). Same
             // GameObject as DebugHud — both are OnGUI overlays that find the
-            // controller via RequireComponent, so neither needs wiring.
-            gameGo.AddComponent<SpinSelectorHud>();
-            EditorUtility.SetDirty(controller);
+            // match flow via RequireComponent, so neither needs wiring.
+            GetOrAdd<SpinSelectorHud>(gameGo);
+            EditorUtility.SetDirty(matchFlow);
+            EditorUtility.SetDirty(presentation);
             EditorUtility.SetDirty(switcher);
 
             // ----- 11. Save scene + register in build settings -----
@@ -498,6 +515,22 @@ namespace WeeSpurts.Editor
         }
 
         // ---------- helpers ----------
+
+        /// <summary>
+        /// AddComponent that never stacks a duplicate.
+        ///
+        /// Needed because [RequireComponent] makes Unity add a component's
+        /// dependencies for you: BallLauncher, BowlingMatchFlow and
+        /// BowlingPresentation all require one another, so whichever one you add
+        /// first drags the other two in, and a plain AddComponent for the next
+        /// one would give the object TWO of that component. Same helper
+        /// RoamingSetupTool uses, for the same reason.
+        /// </summary>
+        private static T GetOrAdd<T>(GameObject go) where T : Component
+        {
+            T existing = go.GetComponent<T>();
+            return existing != null ? existing : go.AddComponent<T>();
+        }
 
         private static GameObject MakeBox(GameObject parent, string name, Vector3 position, Vector3 scale, Material mat)
         {

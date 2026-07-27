@@ -32,7 +32,7 @@ namespace WeeSpurts.Player
     /// components should still turn up ApplyMode as the only place that
     /// persists a change.
     ///
-    /// PER-PLAYER, NEVER GLOBAL. BowlingGameController owns the MATCH; it does
+    /// PER-PLAYER, NEVER GLOBAL. BowlingMatchFlow owns the MATCH; it does
     /// not own anyone's mode. In a networked game the active thrower is in
     /// Bowling while everyone else is still Roaming, which is exactly the
     /// walkable-alley behaviour Docs/OpenQuestions.md describes.
@@ -87,7 +87,7 @@ namespace WeeSpurts.Player
         public event Action<ControlMode> OnModeChanged;
 
         // Has any mode been applied yet? Guards against script execution ORDER:
-        // if BowlingGameController.Start happens to run before ours and puts us
+        // if BowlingPresentation.Start happens to run before ours and puts us
         // into Bowling, our own Start must not then yank us back to Roaming.
         // Unity gives no ordering guarantee between two objects' Start methods.
         private bool _modeApplied;
