@@ -12,14 +12,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb17f237a157b4fcf91164a3a0f160b8, type: 3}
   m_Name: BouncyBall
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.BallConfig
-  Mass: 6
+  Mass: 3
   Radius: 0.11
   MinLaunchSpeed: 4
   MaxLaunchSpeed: 14
   SpinCurveForce: 6
+  SpinRampDistance: 18
+  RollSkidHookScale: 0.6
+  SpinDriveForce: 3
   SpawnHeight: 1.3
   Bounciness: 0.877
-  RollingDrag: 0.12
+  RollingDrag: 0.08
   ThrowTimeout: 9
   SettleSpeed: 0.25
   SettleDuration: 0.75
