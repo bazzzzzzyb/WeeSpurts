@@ -48,6 +48,10 @@ Unity/Assets/09RetroBowl.meta
 *.booproj
 *.svd
 
+# Third-party asset packs: shared via Drive, never committed (licenses + repo size).
+# Import them to this exact folder.
+Unity/Assets/ThirdParty/
+
 # Builds & packages
 *.apk
 *.aab

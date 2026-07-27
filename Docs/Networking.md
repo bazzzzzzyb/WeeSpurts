@@ -18,7 +18,7 @@
 ### The bowling sync pattern
 1. Lobby decides turn order.
 2. Active player aims and throws locally.
-3. Client sends **launch parameters only**: position, direction, power, spin, seed.
+3. Client sends **launch parameters only** — the `LaunchParameters` struct (lateral position, angle, power, 2D spin vector, timing error, backward-fumble flag, seed). The struct is the contract; when it grows, this doc doesn't need to.
 4. All clients simulate the roll deterministically from those parameters.
 5. Host confirms the resulting pin state + score; that's the authority everyone adopts.
 

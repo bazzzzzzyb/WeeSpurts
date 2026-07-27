@@ -16,7 +16,7 @@ MonoBehaviour:
   PinHeight: 0.38
   PinMass: 0.9
   KnockedAngleDegrees: 40
-  CenterOfMassHeight01: 0.38
+  CenterOfMassHeight01: 0.45
   UseShapedCollider: 1
   BaseDiameter01: 0.45
   Bounciness: 0.35

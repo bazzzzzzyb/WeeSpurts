@@ -35,7 +35,7 @@ Pipeline (full hand-held steps in `AssetWorkbench.md` §2):
 - **Placeholder now**: Quaternius **Universal Base Characters** (CC0, rigged low-poly humans) — in the game in ~30 minutes.
 - **Animations**: Mixamo (free) retargets thousands of clips onto any humanoid rig — idle, walk, cheer, drunk stumble, taunt, fall. 🤖 Claude Code wires the Animator; 🧑 you shop for funny clips.
 - **Ragdoll comedy**: 🤖 built from the humanoid rig (joints per bone) — big hits flip animation → ragdoll. Works identically on every future character swap.
-- **Your models later**: any rigged humanoid (AI-generated then Mixamo auto-rigged, or downloaded) drops into the same slot, same animations, zero code changes.
+- **Your models later**: any rigged humanoid (AI-generated then Mixamo auto-rigged, or downloaded) drops into the same slot, same animations, near-zero code changes. ⚠️ Reality check (2026-07-25): the Quaternius placeholder itself imports as **Generic**, not Humanoid — its FBX carries a Blender IK control rig that Humanoid rejects. Works fine (Mixamo pre-retargeted the clips), but the drop-in promise fully applies to *clean* rigs like Mixamo auto-rigged ones; details + Tony's options in `OpenQuestions.md` (Characters).
 - **Customization v1**: material color tint + hats on a head bone anchor.
 
 **Fallback (parked):** the bean-ragdoll spec survives as plan B if humanoid ragdolls fight us for more than a week — beans need no rig at all (capsule body, physics hop, upright-spring floppiness dial, face on a quad). Cheap to prototype, proven genre-adjacent (PEAK), but Tony prefers humans — so beans only on evidence.
