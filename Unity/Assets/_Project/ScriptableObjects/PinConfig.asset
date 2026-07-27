@@ -14,7 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.PinConfig
   PinSpacing: 0.3
   PinHeight: 0.38
-  PinMass: 0.8
+  PinMass: 0.9
   KnockedAngleDegrees: 40
-  Bounciness: 0.463
-  Friction: 0.494
+  CenterOfMassHeight01: 0.38
+  UseShapedCollider: 1
+  BaseDiameter01: 0.45
+  Bounciness: 0.35
+  Friction: 0.25

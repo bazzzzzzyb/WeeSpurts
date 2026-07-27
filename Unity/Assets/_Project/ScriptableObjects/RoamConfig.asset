@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bef6d27958efc41bc95c9b827a7ed36b, type: 3}
+  m_Name: RoamConfig
+  m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Player.RoamConfig
+  WalkSpeed: 3.2
+  SprintMultiplier: 1.8
+  GroundedStickVelocity: -2
+  Gravity: -18
+  MouseSensitivity: 2.5
+  PitchClampDegrees: 85
+  EyeHeight: 1.6
+  ControllerRadius: 0.3
+  ControllerHeight: 1.75
+  StepOffset: 0.4
+  SlopeLimit: 48
+  AnimatorSpeedDampTime: 0.12
