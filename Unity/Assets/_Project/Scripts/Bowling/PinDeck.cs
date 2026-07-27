@@ -57,6 +57,13 @@ namespace WeeSpurts.Bowling
                     // thickness makes PhysX eject it hard, so pins launched, blew
                     // past the displaced threshold, read as knocked, and got
                     // hidden by ClearDeadWood — i.e. they vanished.
+                    //
+                    // THIS LINE AND Pin.BuildShapedCollider ARE A LOAD-BEARING
+                    // PAIR — QA flagged this coupling has no test tying it
+                    // together. Removing this offset while the shaped collider
+                    // (or any future thin base pad) is still in use silently
+                    // reintroduces "pins vanish on rack reset." If you ever see
+                    // that symptom again, check THIS line first.
                     Vector3 home = transform.position + offset
                                    + Vector3.up * (pinConfig.PinHeight * 0.5f);
                     pin.transform.position = home;

@@ -16,12 +16,21 @@ namespace WeeSpurts.Player
     ///
     /// THE RULE THIS CLASS EXISTS TO ENFORCE:
     /// <see cref="ApplyMode"/> is the ONLY place in the entire codebase allowed
-    /// to enable or disable a mode-owned component (the CharacterController, the
-    /// FirstPersonController, the ThrowerAimSlide) or to touch the cursor. Every
-    /// other system asks for a MODE — EnterRoaming/EnterBowling — and lets this
-    /// method work out what that means. That is what makes "exactly one mode
-    /// owns your input and your camera" a structural guarantee rather than a
-    /// discipline problem that breaks the first time someone adds a feature.
+    /// to change which mode-owned component is enabled, or to touch the cursor.
+    /// Every other system asks for a MODE — EnterRoaming/EnterBowling — and lets
+    /// this method work out what that means. That is what makes "exactly one
+    /// mode owns your input and your camera" a structural guarantee rather than
+    /// a discipline problem that breaks the first time someone adds a feature.
+    ///
+    /// ONE NARROW, DELIBERATE EXCEPTION: <see cref="MoveToThrowingStance"/>
+    /// toggles characterController.enabled off and back ON again, synchronously,
+    /// around a single teleporting transform write — never leaving it in a
+    /// state ApplyMode didn't already put it in. It is not a second place
+    /// deciding WHICH mode owns the controller (ApplyMode already decided that
+    /// this roll); it is a transient workaround for a CharacterController
+    /// fighting a direct position write. Grepping for ".enabled" on these
+    /// components should still turn up ApplyMode as the only place that
+    /// persists a change.
     ///
     /// PER-PLAYER, NEVER GLOBAL. BowlingGameController owns the MATCH; it does
     /// not own anyone's mode. In a networked game the active thrower is in
@@ -185,12 +194,14 @@ namespace WeeSpurts.Player
                 // needs a visible pointer they can aim at it. Locking the cursor
                 // here would make the spin selector unusable.
                 //
-                // HONEST CAVEAT (verified against docs.unity3d.com): Confined
-                // only actually confines on Windows and Linux standalone builds.
-                // In the Editor and on macOS it behaves as None. That is
-                // harmless — the part that matters is that the cursor is FREE
-                // and VISIBLE — but don't be surprised when you can drag the
-                // mouse out of the Game view on a Mac.
+                // HONEST CAVEAT: docs.unity3d.com states Confined "only works
+                // on Windows and Linux Standalone" — it does NOT say what it
+                // falls back to elsewhere. Observed by testing in this project
+                // (Editor, macOS): it behaves as None, i.e. the cursor is free
+                // rather than confined to the window. That is harmless here —
+                // the part that matters is that the cursor is FREE and VISIBLE
+                // — but don't be surprised when you can drag the mouse out of
+                // the Game view on a Mac.
                 Cursor.lockState = CursorLockMode.Confined;
                 Cursor.visible = true;
             }
