@@ -48,6 +48,39 @@ namespace WeeSpurts.Bowling
 
         public bool IsAiming { get; private set; }
 
+        // Seconds of steering lockout remaining at the start of a roll. See
+        // SteeringLocked below for the whole story.
+        private float _settleRemaining;
+
+        /// <summary>
+        /// True while ←/→ steering is ignored at the very start of a turn.
+        ///
+        /// WHY THIS EXISTS — it is a CONTROLS bug, not a camera one. The
+        /// "you're up" beat (ThrowCameraSequenceConfig.APositionOffset) parks the
+        /// camera IN FRONT of the thrower looking BACK at them, which is the
+        /// whole point of the shot: it puts the player, the settee pit and their
+        /// friends in one frame (GameBible §7, OpenQuestions.md:26 — deliberately
+        /// load-bearing, do not "fix" it by turning the camera round).
+        ///
+        /// But a camera looking back at you MIRRORS left and right on screen,
+        /// and BowlingGameController calls BeginAim() at the START of the roll —
+        /// so for the ~1.6s that beat holds, steering left visibly moves you
+        /// right. Every report of "the controls are backwards" is this window.
+        ///
+        /// The fix is to ignore steering until the shot has turned round, NOT to
+        /// let the launcher read the camera: Docs/CLAUDE.md keeps presentation
+        /// one-directional (the camera reads gameplay, never the reverse), and a
+        /// launcher that asked the camera which way it was facing would invert
+        /// that and put a rendering concern inside LaunchParameters' code path.
+        /// So the DURATION is passed in by the game controller instead, and it is
+        /// only ever non-zero on a new player's turn — the beat only plays then.
+        ///
+        /// Nothing else is blocked: power (SPACE) and the spin widget still work,
+        /// because neither is mirrored by the shot. You can still start charging
+        /// immediately if you're in a hurry.
+        /// </summary>
+        public bool SteeringLocked => _settleRemaining > 0f;
+
         // Exposed for the debug HUD.
         public float CurrentLateral { get; private set; }
         public float CurrentAngle { get; private set; }
@@ -82,9 +115,17 @@ namespace WeeSpurts.Bowling
             CurrentSpin = SpinModel.Clamp(spin);
         }
 
-        /// <summary>Called by the game controller when it's someone's turn to aim.</summary>
-        public void BeginAim()
+        /// <summary>
+        /// Called by the game controller when it's someone's turn to aim.
+        ///
+        /// <paramref name="settleSeconds"/> is how long to ignore ←/→ steering
+        /// for — see <see cref="SteeringLocked"/>. Defaults to 0 (steer
+        /// immediately), which is the right answer for the second roll of a
+        /// frame and for any caller that doesn't play the turn-start beat.
+        /// </summary>
+        public void BeginAim(float settleSeconds = 0f)
         {
+            _settleRemaining = Mathf.Max(0f, settleSeconds);
             IsAiming = true;
             ChargingPower = false;
             CurrentLateral = 0f;
@@ -111,7 +152,13 @@ namespace WeeSpurts.Bowling
         {
             if (!IsAiming) return;
 
-            float steer = Input.GetAxisRaw("Horizontal"); // arrows + A/D, no setup needed
+            // Tick the steering lockout down. Counted here rather than from a
+            // Time.time stamp so that pausing (Time.timeScale = 0) pauses it too.
+            if (_settleRemaining > 0f) _settleRemaining -= Time.deltaTime;
+
+            // Zeroed, not early-returned: power and spin must stay live during
+            // the lockout. Only the two MIRRORED axes are suppressed.
+            float steer = SteeringLocked ? 0f : Input.GetAxisRaw("Horizontal"); // arrows + A/D, no setup needed
 
             if (!ChargingPower)
             {

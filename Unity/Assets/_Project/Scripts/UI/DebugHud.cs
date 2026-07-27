@@ -27,6 +27,12 @@ namespace WeeSpurts.UI
         {
             if (_game.Turns == null) return;
 
+            // Nothing on screen while roaming. Turns is non-null from scene load
+            // now (BowlingGameController.Initialize builds the players up front
+            // and only STARTS the match on request), so the null check above no
+            // longer implies "a match is happening" the way it used to.
+            if (!_game.HudVisible) return;
+
             // ----- Phase banner -----
             GUI.Box(new Rect(10, 10, 620, 26), _game.Phase);
 
