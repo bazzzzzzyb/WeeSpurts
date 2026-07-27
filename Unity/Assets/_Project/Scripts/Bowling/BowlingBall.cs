@@ -64,10 +64,49 @@ namespace WeeSpurts.Bowling
             _rb = GetComponent<Rigidbody>();
             _collider = GetComponent<Collider>();
             _renderer = GetComponent<Renderer>();
-            // Fast small object vs thin pins: continuous collision stops the
-            // ball tunneling straight through a pin at high power.
-            _rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+
+            // ContinuousDynamic, NOT Continuous — and the difference is the whole
+            // point, because it is the difference between the ball hitting pins
+            // and passing through them.
+            //
+            // Unity's CollisionDetectionMode.Continuous only sweeps against
+            // STATIC colliders. Against another RIGIDBODY it silently falls back
+            // to discrete unless that other body is itself ContinuousDynamic.
+            // Pins are rigidbodies. So "Continuous" here bought us CCD against
+            // the lane and the rails — exactly the things a heavy ball was never
+            // going to tunnel through — and nothing at all against the pins,
+            // which is the one case that matters.
+            //
+            // THE NUMBERS: at MaxLaunchSpeed 14 m/s and a 0.02s fixed timestep
+            // the ball advances 0.28m per physics step. A pin is ~0.12m across.
+            // Discrete collision only checks for overlap at the END of a step,
+            // so the ball can start in front of a pin and finish behind it,
+            // having "missed" it entirely. Cannonball at 20 m/s moves 0.40m.
+            //
+            // ContinuousDynamic sweeps against static geometry AND against
+            // bodies marked Continuous or ContinuousDynamic. Pin.Awake sets the
+            // pins to match — BOTH halves are required, changing only one does
+            // nothing.
+            _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+
+            // Rolling without slipping needs angularVelocity = speed / radius,
+            // which Launch() duly sets — but Unity CLAMPS it to the project's
+            // Default Max Angular Speed (Project Settings > Physics), which is
+            // 50 rad/s here. At 14 m/s with a 0.11m ball the honest number is
+            // 127 rad/s, so the clamp was throwing away 60% of the ball's
+            // rotation and the ball SKIDDED down the lane instead of rolling.
+            // That also quietly weakened everything downstream that reads from
+            // rotation. Raised per-rigidbody rather than in Project Settings so
+            // it cannot affect the pins or anything else in the scene.
+            _rb.maxAngularVelocity = MAX_ANGULAR_VELOCITY;
         }
+
+        /// <summary>
+        /// Radians/second ceiling for the ball specifically. Sized for the
+        /// fastest ball in the game rolling without slipping, with headroom:
+        /// Cannonball's 20 m/s over a 0.10m radius is 200 rad/s.
+        /// </summary>
+        private const float MAX_ANGULAR_VELOCITY = 250f;
 
         /// <summary>
         /// Powerup support (Nuke Shot): hides/shows the real ball while a canned
