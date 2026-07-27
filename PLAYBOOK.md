@@ -45,6 +45,14 @@ When you want something the knobs can't do — wobbly drunk aim, exploding 7-10 
 
 ✅ **Gate ("first playable feel"):** a full 10-frame game on one machine that makes you and Braeden laugh. Record a 15-second clip of the funniest moment — if there's nothing worth clipping yet, iterate here. This clip habit becomes your marketing engine (`Docs/Marketing.md`).
 
+## Stage D⁻ — Pre-networking hardening 🤖 (decided 2026-07-26; do BEFORE Mirror, regardless of when Mirror starts)
+
+Three scoped sessions from the full-project review, one at a time, `/qa-review` + green tests + commit between each. No behaviour change in any current scene is the acceptance bar for all three.
+
+1. **Input authority gate** — all throw-affecting input (BallLauncher, SpinSelectorHud, BallConfigSwitcher, F/R keys) routed through one "may this input act?" predicate anchored on PlayerAvatar/ControlMode, so the Mirror pass swaps a predicate instead of hunting Input calls.
+2. **Controller split** — separate BowlingGameController's match-flow (turns/scoring/roll resolution → future host-side) from local presentation + input glue (→ stays client-side).
+3. **`IsGreen` on LaunchParameters** — replace the `TimingError01 == 0f` float-equality green check with an explicit bool set at release (last cheap schema-change window).
+
 ## Stage D — Steam skeleton (lobby, no gameplay)
 
 1. 🧑 **Install Mirror**: Unity Asset Store (assetstore.unity.com) → search "Mirror" (free, by Mirror Networking) → Add to My Assets → in Unity: Window → Package Manager → My Assets → Mirror → Download → Import.

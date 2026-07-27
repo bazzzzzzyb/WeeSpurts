@@ -39,7 +39,7 @@ Both of us drive the same specialist agents in `.claude/agents/` — gameplay-en
 
 ## 5. The two-person working agreement
 
-- **Ownership is by SYSTEM, not by scene.** Tony: gameplay, throw feel, physics, camera. You: playtesting + config tuning now, growing into environment/props.
+- **Ownership is by SYSTEM, not by scene.** Tony: gameplay, throw feel, physics, camera. You: playtesting + config tuning now, growing into **self-contained props/prefabs you own outright, plus small playtest quality-of-life tools** (venue *building* is frozen until the fun gate — walking and judging the existing one is your job, adding to it is not).
 - **Prefabs are the handoff format.** Both of us do art. One owner per prefab at a time; build in your own sandbox scene, hand off the finished prefab.
 - **One owner per scene at a time, announced in chat.** Scene YAML does not merge — a conflict means someone's work is lost. (This is the #1 two-person Unity killer; take it seriously.)
 - **Physics tuning without collisions:** duplicate the config asset (`PinConfig_BraedenTest.asset`, `BallConfig_BraedenTest.asset`), tune YOUR copy, and merge only winning NUMBERS back into the real asset — same pattern the ball switcher already uses. Add your ball copies to `BallConfigSwitcher`'s list in the Inspector to A/B them live. Note: ball configs apply on the next throw, but PIN physics is partly baked into the scene at build time — after editing a pin config, re-run the scene builder (or ask your Claude which fields need it). Physics CODE changes are a feature branch, one person at a time.
