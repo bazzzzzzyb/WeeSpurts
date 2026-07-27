@@ -143,6 +143,16 @@ namespace WeeSpurts.Bowling
         // every frame by the aim preview, so an unguarded Debug.LogError would
         // produce thousands of identical lines and bury the message it is trying
         // to deliver. Keyed on the config so switching balls re-reports.
+        //
+        // SINGLE-SLOT, NOT A SEEN-SET: this remembers only the LAST config
+        // warned about, not history. Switching oversized A -> oversized B ->
+        // back to A re-warns on the return to A, which is fine for a human
+        // swapping balls between throws (a fresh transition is a fresh event).
+        // It would NOT stay quiet if something cycled between two oversized
+        // configs every frame (e.g. a future powerup alternating BallConfig
+        // rapidly) — that would spam the log once per cycle rather than once
+        // ever. Nothing in the game does that today; worth remembering if one
+        // ever does.
         private BallConfig _oversizedBallWarned;
 
         private void WarnOnceAboutOversizedBall(float half)
