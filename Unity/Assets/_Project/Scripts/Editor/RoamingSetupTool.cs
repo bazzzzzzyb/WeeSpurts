@@ -305,8 +305,12 @@ namespace WeeSpurts.Editor
             firstPersonCamera.cullingMask &= ~modelLayerBit;
             bowlingCamera.cullingMask |= modelLayerBit;
 
-            // ----- 10. Hand the match-start seam to the scene's controller -----
-            BowlingGameController game = FindFirst<BowlingGameController>();
+            // ----- 10. Hand the match-start seam to the scene's bowling game -----
+            // BowlingPresentation, not BowlingMatchFlow: every field this step
+            // writes (auto-start, the stance marker, which avatar throws) is
+            // about THIS machine's player, which is exactly the half the
+            // presentation component owns. See its class comment.
+            BowlingPresentation game = FindFirst<BowlingPresentation>();
             if (game != null)
             {
                 var gameSo = new SerializedObject(game);
@@ -325,7 +329,7 @@ namespace WeeSpurts.Editor
             }
             else
             {
-                Debug.LogWarning("[Roaming] No BowlingGameController in this scene, so nothing starts a " +
+                Debug.LogWarning("[Roaming] No BowlingPresentation in this scene, so nothing starts a " +
                                  "match here. Roaming will still work.");
             }
 
@@ -423,7 +427,7 @@ namespace WeeSpurts.Editor
         /// WORKFLOW IS: rebuild the venue, then re-run this tool. The report line
         /// says so every time.
         /// </summary>
-        private static string PlaceLaneKiosk(BowlingGameController game)
+        private static string PlaceLaneKiosk(BowlingPresentation game)
         {
             int laneNumber = ReadPlayableLaneIndex(out string laneSource);
 
@@ -478,7 +482,7 @@ namespace WeeSpurts.Editor
 
             string gameNote = game != null
                 ? $"wired to '{game.name}'"
-                : "NOT WIRED — no BowlingGameController in this scene, so it will offer nothing";
+                : "NOT WIRED — no BowlingPresentation in this scene, so it will offer nothing";
 
             return $"LANE KIOSK: on '{kiosk.name}' at world position {kiosk.transform.position} — " +
                    $"{placement}; lane {laneNumber} ({laneSource}); {gameNote}. " +

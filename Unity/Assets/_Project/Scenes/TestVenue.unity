@@ -1687,7 +1687,7 @@ MonoBehaviour:
   ball: {fileID: 1708011249}
   pinDeck: {fileID: 2107189239}
   thrower: {fileID: 412184817}
-  laneConfig: {fileID: 0}
+  laneConfig: {fileID: 11400000, guid: 27fa5e01742214b70adfbd31f36b6490, type: 2}
   sequenceCamera: {fileID: 112455906}
 --- !u!81 &112455905
 AudioListener:
@@ -12533,7 +12533,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cebb0282c857b4da8b430eaf2f68dd41, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.LaneKioskInteractable
-  game: {fileID: 1847381575}
+  game: {fileID: 1847381581}
   laneNumber: 6
   interactionPoint: {fileID: 0}
 --- !u!4 &1044115967
@@ -22879,10 +22879,11 @@ GameObject:
   m_Component:
   - component: {fileID: 1847381580}
   - component: {fileID: 1847381576}
-  - component: {fileID: 1847381575}
   - component: {fileID: 1847381579}
   - component: {fileID: 1847381578}
   - component: {fileID: 1847381577}
+  - component: {fileID: 1847381575}
+  - component: {fileID: 1847381581}
   m_Layer: 0
   m_Name: BowlingGame
   m_TagString: Untagged
@@ -22899,7 +22900,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1847381574}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6719d5f0d3eb649c8a8cd89b98488d38, type: 3}
+  m_Script: {fileID: 11500000, guid: facb32832ad2244d39d3b9c1be4874b1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.BowlingGameController
   ballConfig: {fileID: 11400000, guid: b9ce24e00317f4338aa0d16e1727f7a4, type: 2}
@@ -22907,14 +22908,7 @@ MonoBehaviour:
   ball: {fileID: 1708011249}
   pinDeck: {fileID: 2107189238}
   launcher: {fileID: 1847381576}
-  throwCamera: {fileID: 112455902}
   ballSpawn: {fileID: 1671237296}
-  throwReactionBehaviour: {fileID: 1870194525}
-  nukeResolver: {fileID: 657046963}
-  sandboxAutoStart: 0
-  throwingStance: {fileID: 1298165607}
-  sandboxThrower: {fileID: 1746238796}
-  turnStartSteeringLockSeconds: 1.65
 --- !u!114 &1847381576
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -22993,6 +22987,25 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1847381581
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1847381574}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7943d5237d51467197c098d8e7792af, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.BowlingPresentation
+  throwCamera: {fileID: 112455902}
+  throwReactionBehaviour: {fileID: 1870194525}
+  nukeResolver: {fileID: 657046963}
+  sandboxAutoStart: 0
+  throwingStance: {fileID: 1298165607}
+  sandboxThrower: {fileID: 1746238796}
+  turnStartSteeringLockSeconds: 1.65
 --- !u!1 &1852011830
 GameObject:
   m_ObjectHideFlags: 0

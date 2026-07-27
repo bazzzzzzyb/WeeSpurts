@@ -7,7 +7,7 @@ namespace WeeSpurts.Player
     /// (Docs/OpenQuestions.md — "free-roam continues for everyone even
     /// mid-game; only the active player gets pulled").
     ///
-    /// It lives on <see cref="PlayerAvatar"/>, and BowlingGameController owns
+    /// It lives on <see cref="PlayerAvatar"/>, and BowlingMatchFlow owns
     /// the MATCH, never anyone's mode. If you ever find yourself writing
     /// "the game is in bowling mode", that's the bug this enum exists to stop.
     /// </summary>

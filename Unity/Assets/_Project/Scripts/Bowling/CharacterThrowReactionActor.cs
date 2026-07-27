@@ -16,7 +16,7 @@ namespace WeeSpurts.Bowling
     /// SETUP: sits on the PlayerCharacter prefab root, above the imported model
     /// (the Animator is found in children). CharacterSetupTool builds that
     /// prefab; GreyboxSceneBuilder drops it in and wires it into
-    /// BowlingGameController. The Animator needs the PlayerCharacter controller
+    /// BowlingPresentation. The Animator needs the PlayerCharacter controller
     /// that CharacterSetupTool generates — its trigger names must match the
     /// constants below.
     /// </summary>

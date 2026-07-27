@@ -11,9 +11,9 @@ Text in `blocks like this` after "Tell Claude Code:" is a prompt — paste it ve
 
 ---
 
-## Stage A — Install the tools 🧑 (once per machine, ~1 hour; Braeden does A too)
+## Stage A — Install the tools 🧑 (once per machine, ~1 hour; Braeden does A too) — ✅ DONE on Tony's machine
 
-1. **Unity Hub + Unity 6 LTS**: download Unity Hub from unity.com/download → install → sign in (free Personal license) → Installs → Install Editor → pick the newest **6000.x LTS** (badge says LTS) → check "Windows Build Support" (and nothing else) → Install. The code in this repo requires Unity 6 (it uses Unity 6 physics APIs, with fallbacks — but 6 LTS is the target).
+1. **Unity Hub + Unity — EXACTLY 6000.5.4f1** (the version pinned in `Unity/ProjectSettings/ProjectVersion.txt`; a different version re-serialises project files and poisons every diff): Unity Hub → Installs → Install Editor → find 6000.5.4f1 (Archive tab if not listed) → check "Windows Build Support" → Install.
 2. **Git + Git LFS**: install from git-scm.com and git-lfs.com → open a terminal → `git lfs install`.
 3. **Claude Code**: follow code.claude.com → install → in a terminal, `cd` into this repo folder → run `claude`. It reads `CLAUDE.md` automatically — no pasting, ever.
 4. **Steam** running and logged in (needed from Stage D on).
@@ -21,22 +21,22 @@ Text in `blocks like this` after "Tell Claude Code:" is a prompt — paste it ve
 
 ✅ **Check:** `claude` starts inside the repo and can answer "what are this project's golden rules?"
 
-## Stage B — Create the Unity project and drop the code in (~30 min)
+## Stage B — Create the Unity project and drop the code in (~30 min) — ✅ DONE 2026-07-22 (steps kept for Braeden's fresh-clone reference; his version is `Docs/Onboarding.md`)
 
 1. 🧑 Unity Hub → New Project → template **Universal 3D** → name `WeeSpurts` → location: your **Documents** folder (NOT this repo — Hub needs an empty folder; we move it next) → Create. Wait for first open, then **close Unity**.
 2. 🤖 Tell Claude Code:
    `Move the Unity project from my Documents/WeeSpurts into this repo's Unity/ folder (keep Unity/README.md), then merge _Staging/_Project into Unity/Assets/_Project and delete the _Staging folder. Show me what you moved.`
 3. 🧑 Unity Hub → Add → select the repo's `Unity` folder → open it. First import takes a few minutes.
 4. 🧑 **One required setting** (our input code uses the classic system): Edit → Project Settings → Player → Other Settings → **Active Input Handling = Both** → let the editor restart.
-5. 🧑 **Prove the code is healthy**: Window → General → Test Runner → EditMode tab → Run All. ✅ **Expect: 12/12 green.** Anything red: copy the message, tell Claude Code `these tests failed: <paste>`.
-6. 🧑 **The magic click**: menu bar → **WeeSpurts → Build Greybox Bowling Scene** → press **Play**. Aim with ←/→ (Shift+←/→ for angle), hold **SPACE** and release at the top of the power bar, **Q/E** for spin. Two hot-seat players, full 10 frames, live scorecard.
+5. 🧑 **Prove the code is healthy**: Window → General → Test Runner → EditMode tab → Run All. ✅ **Expect: all EditMode tests green** (72 tests across 4 files as of 2026-07-26). Anything red: copy the message, tell Claude Code `these tests failed: <paste>`.
+6. 🧑 **The magic click**: menu bar → **WeeSpurts → Build Greybox Bowling Scene** → press **Play**. Current controls live in `Docs/Onboarding.md` §3 (the originals here went stale: the meter now rises once into a green zone, and Q/E spin became a 2D mouse/IJKL selector). Two hot-seat players, full 10 frames, live scorecard.
 7. 🤖 Tell Claude Code: `Everything works. Commit all of this on main with a good message and push.`
 
 ✅ **Gate (Core Framework done):** tests green, you bowled a frame, Braeden pulls and can do the same.
 
 ## Stage C — Make the throw FUNNY 🧑 (the highest-leverage week in the project)
 
-Feel is tuned by playing, not coding. In the Project window: `_Project/ScriptableObjects/` → click **BallConfig** / **LaneConfig** → change numbers in the Inspector → press Play. No code, no rebuild (re-run the scene builder only after LaneConfig *geometry* changes).
+Feel is tuned by playing, not coding. In the Project window: `_Project/ScriptableObjects/` → click **BallConfig** / **LaneConfig** / **PinConfig** → change numbers in the Inspector → press Play. No code, no rebuild (re-run the scene builder only after LaneConfig *geometry* changes).
 
 Things to try deliberately: MaxLaunchSpeed 25 (cannonball), Mass 2 + Bounciness 0.9 (beach ball), PinMass 0.4 (pins launch into orbit), Width 3 (party lane). Find 2–3 configs that make you both laugh.
 
@@ -44,6 +44,14 @@ When you want something the knobs can't do — wobbly drunk aim, exploding 7-10 
 `/build-system Bowling feel: <describe the funny thing>. Use the physics-tech-artist agent. It must be driven only by LaunchParameters + config so it stays network-reproducible.`
 
 ✅ **Gate ("first playable feel"):** a full 10-frame game on one machine that makes you and Braeden laugh. Record a 15-second clip of the funniest moment — if there's nothing worth clipping yet, iterate here. This clip habit becomes your marketing engine (`Docs/Marketing.md`).
+
+## Stage D⁻ — Pre-networking hardening 🤖 (decided 2026-07-26; do BEFORE Mirror, regardless of when Mirror starts)
+
+Three scoped sessions from the full-project review, one at a time, `/qa-review` + green tests + commit between each. No behaviour change in any current scene is the acceptance bar for all three.
+
+1. **Input authority gate** — all throw-affecting input (BallLauncher, SpinSelectorHud, BallConfigSwitcher, F/R keys) routed through one "may this input act?" predicate anchored on PlayerAvatar/ControlMode, so the Mirror pass swaps a predicate instead of hunting Input calls.
+2. **Controller split** — separate BowlingGameController's match-flow (turns/scoring/roll resolution → future host-side) from local presentation + input glue (→ stays client-side).
+3. **`IsGreen` on LaunchParameters** — replace the `TimingError01 == 0f` float-equality green check with an explicit bool set at release (last cheap schema-change window).
 
 ## Stage D — Steam skeleton (lobby, no gameplay)
 
