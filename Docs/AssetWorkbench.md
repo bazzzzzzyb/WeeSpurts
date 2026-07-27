@@ -28,7 +28,7 @@ Direction: normal-ish low-poly humans doing dumb physics — the Lethal Company 
 
 **Starter animation shopping list (search these on Mixamo):** Idle, Walking, Excited, Defeat, Drunk Walk, Silly Dancing, Taunt, Cheering, Falling — plus a bowling-ish throw (search "throw"; we'll fake the rest with physics).
 
-**Later (your AI lane):** when AI 3D tools give you a character you love, it must be a **rigged humanoid** (or run it through Mixamo's auto-rigger) — then it drops into the same slot, same animations, zero code changes. Ragdoll-on-impact still happens (Claude Code builds ragdolls from any humanoid rig), so the physics comedy survives every reskin.
+**Later (your AI lane):** when AI 3D tools give you a character you love, run it through Mixamo's auto-rigger — auto-rigged characters import as true Humanoid and drop into the slot cleanly. (The Quaternius placeholder itself is Generic — its Blender IK rig fails Humanoid import; see `OpenQuestions.md`. `CharacterSetupTool` handles it either way.) Ragdoll-on-impact still happens (Claude Code builds ragdolls from any humanoid rig), so the physics comedy survives every reskin.
 
 ## 3. Your AI 2D queue (start today, all safe from redesign)
 
