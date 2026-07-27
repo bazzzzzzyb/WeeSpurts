@@ -11,7 +11,7 @@ namespace WeeSpurts.Bowling
     /// no live randomness, so every client renders the same target pose.
     ///
     /// SETUP: sits on a Capsule primitive near the foul line.
-    /// GreyboxSceneBuilder creates it and wires it into BowlingGameController.
+    /// GreyboxSceneBuilder creates it and wires it into BowlingPresentation.
     /// </summary>
     public class CapsuleThrowReactionActor : MonoBehaviour, IThrowReactionActor
     {
@@ -39,7 +39,7 @@ namespace WeeSpurts.Bowling
         {
             // Stop any in-flight tween so a rapid re-trigger (e.g. sandbox F
             // frame-reset) doesn't stack multiple tweens fighting each other —
-            // same reason BowlingGameController.ResetCurrentFrame calls
+            // same reason BowlingMatchFlow.ResetCurrentFrame calls
             // StopAllCoroutines().
             if (_running != null) StopCoroutine(_running);
 

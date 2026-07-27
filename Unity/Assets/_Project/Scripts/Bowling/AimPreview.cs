@@ -6,7 +6,7 @@ namespace WeeSpurts.Bowling
     /// Sandbox/debug-only visual for the AIM phase. While the ball is frozen
     /// waiting to be thrown, this slides it sideways to match
     /// BallLauncher.CurrentLateral (using the SAME halfLane math
-    /// BowlingGameController uses at throw time, via HalfLaneWidth) and draws
+    /// BowlingMatchFlow uses at throw time, via HalfLaneWidth) and draws
     /// a short curved LineRenderer previewing direction (CurrentAngle) and
     /// curve (CurrentSpin, via SpinModel). Purely cosmetic: never touches LaunchParameters,
     /// BowlingScorer, or the resolved throw. Safe to remove before shipping.
@@ -24,13 +24,13 @@ namespace WeeSpurts.Bowling
         // GreyboxSceneBuilder, not at Play-mode startup. Without
         // SerializeField these references wouldn't survive being saved into
         // the .unity scene, and would be null on the next Play session or
-        // scene reload — same reason BowlingGameController's own
+        // scene reload — same reason BowlingMatchFlow's own
         // Configure()-wired fields are SerializeField.
         [SerializeField] private BallLauncher launcher;
-        [SerializeField] private BowlingGameController game;
+        [SerializeField] private BowlingMatchFlow game;
         [SerializeField] private LineRenderer line;
 
-        public void Configure(BallLauncher launcherRef, BowlingGameController gameRef, LineRenderer lineRef)
+        public void Configure(BallLauncher launcherRef, BowlingMatchFlow gameRef, LineRenderer lineRef)
         {
             launcher = launcherRef;
             game = gameRef;

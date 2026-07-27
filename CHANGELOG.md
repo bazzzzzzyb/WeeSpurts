@@ -4,6 +4,16 @@ All notable changes to Wee Spurts. Newest at the top. Updated on request.
 
 ## [Unreleased]
 
+### Changed
+- **Pre-networking hardening pass, ahead of Mirror.** No gameplay or feel changes; behavior confirmed identical by Tony in the editor after each step, and the 72 EditMode tests stayed green throughout.
+  - `LaunchParameters` gained an explicit `IsGreen` bool, set once by `BallLauncher` at release, replacing a `TimingError01 == 0f` float-equality check the Nuke resolver used to re-derive.
+  - Added a throw-input gate (`BowlingPresentation.ThrowInputAllowed` / `IsMyAvatar`, anchored on the existing `PlayerAvatar.ControlMode`/`IsLocal`) in front of every throw-affecting input — `BallLauncher`, `BallConfigSwitcher`'s ball-select keys, and the sandbox F/R keys — so that once Mirror lands, one client's keyboard can't drive another player's throw. `F` requires identity + turn; `R` requires identity only (the avatar is already back in Roaming mode by the time `R` is reachable). Scenes with no `PlayerAvatar` wired are unaffected — the gate stays permanently open.
+  - Split `BowlingGameController` (500+ lines) into **`BowlingMatchFlow`** (turn order, scoring, nuke outcome — the host-authoritative half under Mirror) and **`BowlingPresentation`** (camera calls, avatar handoff, sandbox keys, the input gate — the client-local half). Ten consumers (`DebugHud`, `SpinSelectorHud`, `ThrowCameraSequence`, `ThrowerAimSlide`, `AimPreview`, `LaneKioskInteractable`, `GreyboxSceneBuilder`, `RoamingSetupTool`, plus `BallLauncher`/`BallConfigSwitcher`) retargeted to whichever class now owns what they need.
+  - QA-reviewed (qa-engineer agent): verdict safe to merge — no hallucinated APIs, no trust gaps in the gate or the split.
+
+### Known issues
+- **The backward-fumble gag (a near-zero-power tap flings the ball backward) does not currently fire**, on the default, bouncy, or wobble balls — pre-existing, surfaced during this session's testing, not caused by it. Tony's direction for a future pass: tie it to thrower animation timing (release during the backswing) rather than the current power threshold.
+
 ### Added
 - **Per-player roaming + a reusable interaction system — the roam/bowl split the walkable-alley design hangs off.** You now walk the venue in first person, approach the lane screen, and press E to start the match, instead of the match auto-starting on scene load.
   - **New `PlayerAvatar` owns a per-player `ControlMode` (Roaming/Bowling) — never a global game state.** The active thrower locks into the Wii-style stance while everyone else stays free-roaming; when Mirror lands, the other players are already roaming by construction rather than needing a rewrite. `ApplyMode()` is the single chokepoint allowed to enable/disable mode-owned components (`CharacterController`, `FirstPersonController`, `ThrowerAimSlide`) or touch the cursor — grep for `.enabled` on any of those and `ApplyMode` is the only place a change *persists* (one narrow, documented exception: `MoveToThrowingStance` toggles the controller off and back on again around a single teleporting write).

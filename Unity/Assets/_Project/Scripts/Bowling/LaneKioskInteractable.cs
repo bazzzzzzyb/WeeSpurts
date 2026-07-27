@@ -37,8 +37,8 @@ namespace WeeSpurts.Bowling
         // [SerializeField] on every reference — wired by RoamingSetupTool at
         // EDITOR time, so anything Unity doesn't serialize is null again after
         // the next scene reload (the AimPreview lesson).
-        [Tooltip("The scene's BowlingGameController — the thing this kiosk starts. Without it the kiosk offers nothing rather than throwing when used.")]
-        [SerializeField] private BowlingGameController game;
+        [Tooltip("The scene's BowlingPresentation (on the BowlingGame object) — the thing this kiosk starts. It is the LOCAL half of the bowling game because starting a match from here also hands this machine's player to the foul line. Without it the kiosk offers nothing rather than throwing when used.")]
+        [SerializeField] private BowlingPresentation game;
 
         [Tooltip("Which lane this kiosk belongs to (1-based, matching AlleyLayoutConfig.PlayableLaneIndex and the Anchor_LaneNN markers). Shown in the prompt, and the field the multi-lane version will key off when there is more than one playable lane.")]
         [SerializeField] private int laneNumber = 6;
@@ -63,10 +63,14 @@ namespace WeeSpurts.Bowling
         /// MatchInProgress goes false the instant the last frame resolves, so
         /// checking only that would re-offer "[E] Start Game" over the final
         /// scorecard while everyone is still reading it — and the player is
-        /// standing right here, because BowlingGameController hands them back
+        /// standing right here, because BowlingPresentation hands them back
         /// to roaming when the match ends. MatchOver is what keeps the kiosk
         /// quiet until R reloads the scene for a rematch. (Same pair of flags,
-        /// same reasoning, as BowlingGameController.HudVisible.)
+        /// same reasoning, as DebugHud's "is the HUD on screen" check.)
+        ///
+        /// Both flags are read through BowlingPresentation's passthroughs rather
+        /// than by holding a second reference to BowlingMatchFlow — this kiosk
+        /// only ever asks one question, so it only needs one reference.
         /// </summary>
         public bool CanInteract(PlayerAvatar player)
         {

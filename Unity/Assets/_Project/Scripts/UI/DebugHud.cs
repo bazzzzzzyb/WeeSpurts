@@ -9,17 +9,21 @@ namespace WeeSpurts.UI
     /// OnGUI. Intentionally ugly: it needs no Canvas, no fonts, no wiring —
     /// perfect for the greybox phase. The real HUD (Roadmap [5]) replaces it.
     ///
-    /// SETUP: same GameObject as BowlingGameController.
+    /// SETUP: same GameObject as BowlingMatchFlow.
     /// </summary>
-    [RequireComponent(typeof(BowlingGameController))]
+    [RequireComponent(typeof(BowlingMatchFlow))]
     public class DebugHud : MonoBehaviour
     {
-        private BowlingGameController _game;
+        // The MATCH half: everything this HUD draws (turns, phase, scores, the
+        // armed ball) is match state. It deliberately does not hold a
+        // BowlingPresentation reference — a scoreboard has no business asking
+        // whose keyboard is live.
+        private BowlingMatchFlow _game;
         private BallConfigSwitcher _switcher; // optional (sandbox only)
 
         private void Awake()
         {
-            _game = GetComponent<BowlingGameController>();
+            _game = GetComponent<BowlingMatchFlow>();
             _switcher = GetComponent<BallConfigSwitcher>();
         }
 
@@ -27,11 +31,19 @@ namespace WeeSpurts.UI
         {
             if (_game.Turns == null) return;
 
-            // Nothing on screen while roaming. Turns is non-null from scene load
-            // now (BowlingGameController.Initialize builds the players up front
+            // Nothing on screen while roaming: the scorecard, phase banner and
+            // control hints are match furniture, and leaving them up while you
+            // walk around the alley reads as UI debris rather than as a game
+            // that hasn't started (Tony's call). Turns is non-null from scene
+            // load now (BowlingMatchFlow.Initialize builds the players up front
             // and only STARTS the match on request), so the null check above no
             // longer implies "a match is happening" the way it used to.
-            if (!_game.HudVisible) return;
+            //
+            // Deliberately NOT just MatchInProgress — that goes false the
+            // instant the match completes, which would yank the final scores off
+            // screen at exactly the moment everyone wants to read them.
+            // MatchOver keeps them up until R reloads the scene.
+            if (!(_game.MatchInProgress || _game.MatchOver)) return;
 
             // ----- Phase banner -----
             GUI.Box(new Rect(10, 10, 620, 26), _game.Phase);

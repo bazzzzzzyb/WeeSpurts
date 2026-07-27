@@ -62,8 +62,21 @@ namespace WeeSpurts.Bowling
         /// </summary>
         public bool IsBackwardFumble;
 
+        /// <summary>
+        /// True when the release landed inside the power meter's green zone
+        /// (the same "0 = perfect" case TimingError01 already encodes). Split
+        /// out as its own named field — rather than making every caller
+        /// re-derive it by comparing TimingError01 to 0f — because this
+        /// struct is about to be the network wire format (see the class doc
+        /// comment): a float equality check re-typed at each call site is one
+        /// bad refactor of the timing math away from silently breaking the
+        /// Nuke Shot's green check with no compiler error to catch it.
+        /// </summary>
+        public bool IsGreen;
+
         public override string ToString() =>
             $"pos {LateralPosition01:F2}, angle {AngleDegrees:F1}°, power {Power01:P0}, spin ({Spin.x:F2}, {Spin.y:F2}), seed {Seed}, timing {TimingError01:+0.00;-0.00;0.00}"
-            + (IsBackwardFumble ? ", BACKWARD FUMBLE" : "");
+            + (IsBackwardFumble ? ", BACKWARD FUMBLE" : "")
+            + (IsGreen ? ", GREEN" : "");
     }
 }

@@ -7,7 +7,7 @@ namespace WeeSpurts.Bowling
     /// so the player and the ball move together instead of the ball drifting
     /// away from a statue.
     ///
-    /// CRITICAL — it reads BowlingGameController.HalfLaneWidth, the SAME value
+    /// CRITICAL — it reads BowlingMatchFlow.HalfLaneWidth, the SAME value
     /// AimPreview and ResolveThrow use, and does NOT recompute the lateral
     /// maths. That property exists precisely so the preview and the resolved
     /// throw can't disagree; the character has to be bound to it for the same
@@ -39,7 +39,7 @@ namespace WeeSpurts.Bowling
         // Configure() is called by the EDITOR-time GreyboxSceneBuilder, not at
         // Play-mode startup, so these must survive being saved into the scene.
         [SerializeField] private BallLauncher launcher;
-        [SerializeField] private BowlingGameController game;
+        [SerializeField] private BowlingMatchFlow game;
 
         [Tooltip("Where the character stands at zero lateral aim. Captured by Configure() at " +
                  "scene-build time so it can't drift with wherever they happened to stop.")]
@@ -49,7 +49,7 @@ namespace WeeSpurts.Bowling
         // resetting it mid-slide is what makes damping snap.
         private float _slideVelocity;
 
-        public void Configure(BallLauncher launcherRef, BowlingGameController gameRef)
+        public void Configure(BallLauncher launcherRef, BowlingMatchFlow gameRef)
         {
             launcher = launcherRef;
             game = gameRef;
