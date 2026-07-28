@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 namespace WeeSpurts.Bowling
@@ -29,8 +30,19 @@ namespace WeeSpurts.Bowling
         public const string ExcitedTrigger = "Excited";
         public const string DefeatTrigger = "Defeat";
         public const string FallFlatTrigger = "FallFlat";
+        public const string ThrowTrigger = "Throw";
         public const string DrunkBool = "Drunk";
         public const string SpeedFloat = "Speed";
+
+        /// <summary>
+        /// Safety net for <see cref="PlayOutcomeAfterThrow"/>'s poll loop — not
+        /// the throw's real duration (that comes from the Animator itself once
+        /// the Throw state is actually current). Purely an upper bound so a
+        /// broken Animator wiring (wrong controller, missing Throw state) can't
+        /// wedge the coroutine forever waiting for a state that will never
+        /// become current.
+        /// </summary>
+        private const float MaxThrowStateWaitSeconds = 3f;
 
         [Tooltip("Animator driving the character. Left empty, it's found on this object or its children at Awake.")]
         [SerializeField] private Animator animator;
@@ -44,8 +56,15 @@ namespace WeeSpurts.Bowling
         private int _excitedHash;
         private int _defeatHash;
         private int _fallFlatHash;
+        private int _throwHash;
         private int _drunkHash;
         private int _speedHash;
+
+        // The coroutine started by PlayReaction, tracked so a rapid re-throw
+        // (back-to-back turns, or the sandbox F-key frame reset) can cancel a
+        // still-running wait instead of leaving two queued outcome triggers to
+        // fight each other.
+        private Coroutine _reactionRoutine;
 
         private void Awake()
         {
@@ -56,6 +75,7 @@ namespace WeeSpurts.Bowling
             _excitedHash = Animator.StringToHash(ExcitedTrigger);
             _defeatHash = Animator.StringToHash(DefeatTrigger);
             _fallFlatHash = Animator.StringToHash(FallFlatTrigger);
+            _throwHash = Animator.StringToHash(ThrowTrigger);
             _drunkHash = Animator.StringToHash(DrunkBool);
             _speedHash = Animator.StringToHash(SpeedFloat);
         }
@@ -64,15 +84,80 @@ namespace WeeSpurts.Bowling
         {
             if (animator == null) return;
 
-            // Reset the other two triggers before setting one. A trigger that
-            // was set but never consumed (e.g. two throws resolved back to
-            // back, or the sandbox frame-reset key) stays queued in the
-            // Animator and would fire a stale reaction on the NEXT throw.
+            // Reset all four triggers before setting one. A trigger that was
+            // set but never consumed (e.g. two throws resolved back to back,
+            // or the sandbox frame-reset key) stays queued in the Animator and
+            // would fire a stale reaction — or a stale second Throw — on the
+            // NEXT throw.
             animator.ResetTrigger(_excitedHash);
             animator.ResetTrigger(_defeatHash);
             animator.ResetTrigger(_fallFlatHash);
+            animator.ResetTrigger(_throwHash);
 
+            // SEQUENCING: play the throw motion FIRST and hold the outcome
+            // reaction (Excited/Defeat/FallFlat) until it's actually finished,
+            // instead of firing both triggers in the same frame. AnyState
+            // transitions (see CharacterSetupTool.AddReaction) are re-evaluated
+            // every single frame regardless of the CURRENT state — so setting
+            // an outcome trigger the same frame as ThrowTrigger would let the
+            // outcome's AnyState transition win almost immediately, cutting the
+            // throw motion off before it ever got to play. Sequencing the two
+            // is what lets the throw animation actually finish before the
+            // celebrate/dejected reaction takes over.
+            PlayThrow();
+
+            if (_reactionRoutine != null) StopCoroutine(_reactionRoutine);
+            _reactionRoutine = StartCoroutine(PlayOutcomeAfterThrow(p));
+        }
+
+        /// <summary>
+        /// Fires the Throw trigger on its own. Small and separately testable/
+        /// callable per Tony's instruction — PlayReaction is the only caller
+        /// today, but nothing stops another system from triggering just the
+        /// throw motion later.
+        /// </summary>
+        public void PlayThrow()
+        {
+            if (animator != null) animator.SetTrigger(_throwHash);
+        }
+
+        /// <summary>
+        /// Waits for the Throw state to actually be playing, then for its full
+        /// clip length, before firing the outcome trigger — see the sequencing
+        /// comment in PlayReaction for why this delay exists.
+        /// </summary>
+        private IEnumerator PlayOutcomeAfterThrow(LaunchParameters p)
+        {
+            // The AnyState -> Throw transition cross-fades in over its own
+            // duration (CharacterSetupTool.AddReaction's 0.1s), so
+            // GetCurrentAnimatorStateInfo(0) keeps reporting whatever was
+            // playing BEFORE the trigger fired until that blend completes.
+            // Poll until Throw is genuinely the current state rather than
+            // trusting the very next frame, with a safety timeout in case the
+            // Animator is wired wrong and Throw never becomes current.
+            float waited = 0f;
+            while (!animator.GetCurrentAnimatorStateInfo(0).IsName(ThrowTrigger) &&
+                   waited < MaxThrowStateWaitSeconds)
+            {
+                waited += Time.deltaTime;
+                yield return null;
+            }
+
+            AnimatorStateInfo throwState = animator.GetCurrentAnimatorStateInfo(0);
+            // normalizedTime is how far through the clip we already are (0 at
+            // the state's start, 1 at its end) — multiplying the REMAINDER by
+            // length means this waits only for whatever's actually left of the
+            // clip, so it doesn't double-wait if the poll above ate a frame or
+            // two before Throw became current.
+            float remaining = throwState.length * Mathf.Max(0f, 1f - throwState.normalizedTime);
+            if (remaining > 0f) yield return new WaitForSeconds(remaining);
+
+            animator.ResetTrigger(_excitedHash);
+            animator.ResetTrigger(_defeatHash);
+            animator.ResetTrigger(_fallFlatHash);
             animator.SetTrigger(ChooseReactionHash(p));
+
+            _reactionRoutine = null;
         }
 
         /// <summary>

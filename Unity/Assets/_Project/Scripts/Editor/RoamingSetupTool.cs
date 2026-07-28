@@ -27,11 +27,12 @@ namespace WeeSpurts.Editor
     ///
     /// THE SINGLE MOST IMPORTANT DETAIL: the CharacterController goes on the new
     /// `Player` root and NEVER on the Thrower. The PlayerCharacter prefab root
-    /// carries localScale 0.4 (CharacterSetupTool.CharacterDisplayScale), and a
-    /// CharacterController's radius/height are scaled by transform.lossyScale —
-    /// so putting it on the Thrower would silently give you a 0.70m-tall,
-    /// 0.12m-wide controller and every collision number in the venue would be a
-    /// lie. The Player root is deliberately left at scale 1.
+    /// carries a non-1 localScale (MascotConfig.DisplayScale, applied by
+    /// CharacterSetupTool), and a CharacterController's radius/height are
+    /// scaled by transform.lossyScale — so putting it on the Thrower would
+    /// silently scale the controller by that same factor and every collision
+    /// number in the venue would be a lie. The Player root is deliberately
+    /// left at scale 1.
     ///
     /// IDEMPOTENT: safe to run again after a scene change. It reuses an existing
     /// Player root, camera and stance marker rather than stacking duplicates,

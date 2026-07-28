@@ -1,4 +1,6 @@
 using NUnit.Framework;
+using UnityEngine;
+using WeeSpurts.Bowling;
 using WeeSpurts.Editor;
 
 namespace WeeSpurts.Tests
@@ -106,12 +108,18 @@ namespace WeeSpurts.Tests
         // ---------- scale ----------
 
         [Test]
-        public void CharacterDisplayScale_IsPositive()
+        public void MascotConfig_DefaultDisplayScale_IsPositive()
         {
             // Guards the one thing that would make the prefab root degenerate:
             // a zero or negative uniform scale flattens or mirrors the model,
-            // and LogCharacterHeight divides by it.
-            Assert.Greater(CharacterSetupTool.CharacterDisplayScale, 0f);
+            // and LogCharacterHeight divides by it. DisplayScale moved from a
+            // CharacterSetupTool constant to a MascotConfig ScriptableObject
+            // field (so Tony can retune it from the Inspector) — this checks
+            // the shipped default rather than a live asset on disk, so it
+            // stays a pure, fast test like the ones above.
+            var config = ScriptableObject.CreateInstance<MascotConfig>();
+            Assert.Greater(config.DisplayScale, 0f);
+            Object.DestroyImmediate(config);
         }
     }
 }

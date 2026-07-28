@@ -194,10 +194,15 @@ namespace WeeSpurts.Player
             Vector3 planar = _controller.velocity;
             planar.y = 0f;
 
-            // Normalised against walk speed, so sprinting reads as >1 and the
-            // Animator threshold means the same thing whatever WalkSpeed is
-            // tuned to. Clamp01 keeps it in the range the controller expects.
-            float target = Mathf.Clamp01(planar.magnitude / Mathf.Max(0.01f, config.WalkSpeed));
+            // Normalised against walk speed, so a walk reads as 0..1 and
+            // sprinting reads distinctly higher (up to ~SprintMultiplier)
+            // instead of both clamping to the same 1.0 — CharacterSetupTool's
+            // Walking<->Sprint transition (SprintSpeedThreshold) needs the two
+            // to actually be tellable apart. Mathf.Max(1f, ...) is defensive
+            // only: SprintMultiplier is documented as ">= 1, 1 = no sprint",
+            // but a stray retune below 1 would otherwise flip Clamp's bounds.
+            float target = Mathf.Clamp(planar.magnitude / Mathf.Max(0.01f, config.WalkSpeed),
+                                        0f, Mathf.Max(1f, config.SprintMultiplier));
 
             _animatorSpeed = Mathf.SmoothDamp(_animatorSpeed, target, ref _animatorSpeedVelocity,
                                               config.AnimatorSpeedDampTime);

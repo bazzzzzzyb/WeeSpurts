@@ -17,6 +17,9 @@ MonoBehaviour:
   MinLaunchSpeed: 4
   MaxLaunchSpeed: 14
   SpinCurveForce: 6
+  SpinRampDistance: 18
+  RollSkidHookScale: 0.6
+  SpinDriveForce: 3
   SpawnHeight: 1.3
   Bounciness: 0.25
   RollingDrag: 0.12
@@ -51,4 +54,11 @@ MonoBehaviour:
   ConeAngleJitterDegrees: 6
   ConeSpinJitterMagnitude: 0.3
   WobbleForceMagnitude: 12
-  WobbleFrequencyHz: 0.5
+  WobbleFrequencyHz: 0.8
+  IsNuke: 0
+  NukeBlastRadius: 4
+  NukeExplosionForce: 14
+  NukeTweenDuration: 0.5
+  NukeLockOnPauseDuration: 0.6
+  NukeGreenZoneMin: 0.82
+  NukeGreenZoneMax: 0.85
