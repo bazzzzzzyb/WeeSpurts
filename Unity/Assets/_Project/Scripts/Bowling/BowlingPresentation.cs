@@ -1,4 +1,5 @@
 using System.Collections;
+using Mirror;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using WeeSpurts.Player;
@@ -27,7 +28,7 @@ namespace WeeSpurts.Bowling
     /// GreyboxSceneBuilder creates and wires both.
     /// </summary>
     [RequireComponent(typeof(BowlingMatchFlow))]
-    public class BowlingPresentation : MonoBehaviour
+    public class BowlingPresentation : NetworkBehaviour
     {
         [Header("Wired by GreyboxSceneBuilder")]
         [SerializeField] private ThrowCamera throwCamera;
@@ -170,6 +171,24 @@ namespace WeeSpurts.Bowling
 
             _matchFlow.StartMatch();
         }
+
+        /// <summary>
+        /// SPIKE Step 4 (Docs/spikes/MirrorKcpSpikeStatus.md): the networked
+        /// entry point for "which avatar is the thrower", called by the host
+        /// after PlayerAvatar.CmdRequestStartBowling asks on the owning
+        /// client's behalf. Runs identically on every machine — Mirror
+        /// resolves the PlayerAvatar parameter to the matching spawned
+        /// instance locally (WriteNetworkBehaviour/ReadNetworkBehaviour,
+        /// NetworkWriterExtensions.cs:272 / NetworkReaderExtensions.cs:246),
+        /// so every machine's own StartMatch(thrower) call agrees on WHO.
+        /// Lives here, not on BowlingMatchFlow, because that class's own
+        /// class comment makes "nothing in here knows what a PlayerAvatar is"
+        /// a structural rule — this class already holds PlayerAvatar
+        /// references (_thrower, sandboxThrower), so the network entry point
+        /// for one belongs here too.
+        /// </summary>
+        [ClientRpc]
+        public void RpcStartMatchWith(PlayerAvatar thrower) => StartMatch(thrower);
 
         private void HandleMatchComplete()
         {

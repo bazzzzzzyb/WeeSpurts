@@ -86,11 +86,49 @@ namespace WeeSpurts.Player
         // Unity gives no ordering guarantee between two objects' Start methods.
         private bool _modeApplied;
 
+        private void Awake()
+        {
+            // SPIKE Step 4: wire this avatar's camera director to the scene's
+            // one shared bowling camera. See PlayerCameraDirector.Configure's
+            // doc comment for why this can't be done at prefab-build time —
+            // this player is a prefab instantiated per connection, and a
+            // prefab asset cannot hold a reference to a scene-only object.
+            PlayerCameraDirector cameraDirector = GetComponent<PlayerCameraDirector>();
+            ThrowCamera bowlingCam = FindFirstObjectByType<ThrowCamera>();
+            if (cameraDirector != null && bowlingCam != null)
+                cameraDirector.Configure(bowlingCam.GetComponent<Camera>(), bowlingCam.GetComponent<AudioListener>());
+        }
+
         private void Start()
         {
             // Roaming is the default state of the world: you're standing in the
             // alley, not at the line. Only apply it if nobody beat us to it.
             if (!_modeApplied) EnterRoaming();
+        }
+
+        private void Update()
+        {
+            // SPIKE (Step 4) debug trigger only — not a kiosk/UI, deliberately
+            // out of scope for this spike. Only the owning client can request
+            // this ([Command]'s default requiresAuthority = true), and only
+            // while roaming — no point re-requesting mid-throw.
+            if (isLocalPlayer && Mode == ControlMode.Roaming && Input.GetKeyDown(KeyCode.B))
+                CmdRequestStartBowling();
+        }
+
+        /// <summary>
+        /// SPIKE Step 4: lets the owning client ask to become the match's
+        /// thrower. Runs on the SERVER — real per-client authority (plain
+        /// [Command], not requiresAuthority = false) because unlike
+        /// BowlingMatchFlow.CmdThrow, this one IS about a specific client's
+        /// own identity. Finds the scene's one BowlingPresentation and asks
+        /// it to broadcast the start to every machine.
+        /// </summary>
+        [Command]
+        private void CmdRequestStartBowling()
+        {
+            BowlingPresentation presentation = FindFirstObjectByType<BowlingPresentation>();
+            if (presentation != null) presentation.RpcStartMatchWith(this);
         }
 
         /// <summary>

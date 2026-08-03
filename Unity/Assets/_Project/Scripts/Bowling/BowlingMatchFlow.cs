@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using Mirror;
 using UnityEngine;
 using WeeSpurts.Gameplay;
 
@@ -36,7 +37,7 @@ namespace WeeSpurts.Bowling
     /// GreyboxSceneBuilder creates and wires both.
     /// </summary>
     [RequireComponent(typeof(BowlingPresentation))]
-    public class BowlingMatchFlow : MonoBehaviour
+    public class BowlingMatchFlow : NetworkBehaviour
     {
         [Header("Wired by GreyboxSceneBuilder")]
         [SerializeField] private BallConfig ballConfig;
@@ -341,6 +342,27 @@ namespace WeeSpurts.Bowling
 
         private void HandleThrow(LaunchParameters p)
         {
+            // SPIKE Step 4 (Docs/spikes/MirrorKcpSpikeStatus.md): send to the
+            // host instead of resolving directly. BallLauncher.OnThrow only
+            // ever fires on the actual thrower's own machine (gated by
+            // BowlingPresentation.ThrowInputAllowed), so in practice only the
+            // right client calls this — but the server takes that entirely on
+            // trust. KNOWN GAP for /qa-review and the Step 5 findings: no
+            // server-side check that the caller is Turns.CurrentPlayer. Real
+            // turn-authority validation is bigger than "one throw" and belongs
+            // to the actual Networked Bowling feature (PLAYBOOK Stage E).
+            CmdThrow(p);
+        }
+
+        [Command(requiresAuthority = false)]
+        private void CmdThrow(LaunchParameters p)
+        {
+            RpcResolveThrow(p);
+        }
+
+        [ClientRpc]
+        private void RpcResolveThrow(LaunchParameters p)
+        {
             StartCoroutine(ResolveThrow(p));
         }
 
@@ -376,13 +398,41 @@ namespace WeeSpurts.Bowling
             // Clamp defends against a comedy edge case: a "knocked" pin
             // wobbling back upright would desync deck vs scorer counts.
             int knocked = Mathf.Min(pinDeck.CountKnockedThisRoll(), scorer.PinsStanding);
+            // SPIKE Step 4 drift measurement: every machine just replayed the
+            // SAME LaunchParameters independently — BowlingBall.cs's own class
+            // comment says this drifts a few cm and that's fine, the host's
+            // count is authority. Logging THIS machine's own count is what
+            // makes the drift observable: compare it against the host's number
+            // below (RpcConfirmPinCount) on the non-host machine's console.
+            Debug.Log($"[SpikeThrow] This machine's local physics knocked {knocked} pins.");
+
+            if (!isServer)
+            {
+                // SPIKE SCOPE, deliberately: clients stop here. No pin-transform
+                // snapping (forcing remote clients' individual Pin objects into
+                // the host's exact final state), no local scoring or turn
+                // continuation on non-host machines. RpcConfirmPinCount below is
+                // the entire "everyone snaps to it" for this pass — a count, not
+                // corrected physics. Full state-snap is a Step 5 finding, not
+                // implemented here.
+                yield break;
+            }
 
             RollOutcome outcome = scorer.AddRoll(knocked);
             Debug.Log($"{Turns.CurrentPlayer.DisplayName} knocked {knocked}. Outcome: {outcome}.");
+            RpcConfirmPinCount(knocked);
 
             switch (outcome)
             {
                 case RollOutcome.FrameContinues:
+                    // SPIKE SCOPE: this only reopens aim on the HOST's own
+                    // machine (BeginRoll -> launcher.BeginAim runs on whichever
+                    // machine's code path reaches it, and only the server's
+                    // does past the isServer gate above). If the next roll
+                    // belongs to a remote client, THEIR BallLauncher never
+                    // hears about it. Continuing a match past one throw needs
+                    // BeginRoll itself networked — the real Networked Bowling
+                    // feature, out of scope here. Flag in Step 5 findings.
                     BeginRoll();
                     break;
                 case RollOutcome.FrameComplete:
@@ -391,6 +441,21 @@ namespace WeeSpurts.Bowling
                     if (!MatchOver) BeginRoll();
                     break;
             }
+        }
+
+        /// <summary>
+        /// SPIKE Step 4: the host's confirmed pin count, for every OTHER
+        /// machine to compare against its own locally-logged count above —
+        /// that comparison is the drift measurement this step exists to
+        /// produce. Not a pin-state correction (see ResolveThrow's isServer
+        /// branch) — just the number.
+        /// </summary>
+        [ClientRpc]
+        private void RpcConfirmPinCount(int hostKnocked)
+        {
+            if (isServer) return; // host already logged/acted above
+            Debug.Log($"[SpikeThrow] HOST reports {hostKnocked} pins knocked (authoritative) — " +
+                      "compare against this machine's own local count logged above for drift.");
         }
 
         /// <summary>

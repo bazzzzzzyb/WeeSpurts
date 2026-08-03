@@ -46,6 +46,22 @@ namespace WeeSpurts.Player
         [Tooltip("The AudioListener COMPONENT on the bowling camera, if it has one.")]
         [SerializeField] private AudioListener bowlingListener;
 
+        /// <summary>
+        /// SPIKE Step 4: wires the bowling camera/listener at RUNTIME, not
+        /// edit time. RoamingSetupTool wires these on a scene-baked player
+        /// via SerializedObject because that player and the bowling camera
+        /// are both fixed objects in the SAME saved scene — but a networked
+        /// player is a PREFAB instantiated per connection, and a prefab asset
+        /// cannot hold a reference to a scene-only object (there is no scene
+        /// yet when the prefab is saved). So the one shared scene camera gets
+        /// found and handed to each spawned avatar in code instead.
+        /// </summary>
+        public void Configure(Camera bowlingCam, AudioListener bowlingListen)
+        {
+            bowlingCamera = bowlingCam;
+            bowlingListener = bowlingListen;
+        }
+
         private void OnEnable()
         {
             // Subscribe in OnEnable, unsubscribe in OnDisable. Unity runs every

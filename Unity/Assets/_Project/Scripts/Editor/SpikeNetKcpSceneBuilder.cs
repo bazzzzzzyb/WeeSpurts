@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using WeeSpurts.Bowling;
 using WeeSpurts.Player;
 
 namespace WeeSpurts.Editor
@@ -65,6 +66,8 @@ namespace WeeSpurts.Editor
             GameObject playerPrefab = BuildPlayerPrefab();
             manager.playerPrefab = playerPrefab;
 
+            BuildBowling();
+
             EnsureFolder(ProjectRoot + "/Scenes");
             EditorSceneManager.SaveScene(scene, ScenePath);
 
@@ -78,7 +81,9 @@ namespace WeeSpurts.Editor
             Debug.Log("WeeSpurts spike: built " + ScenePath + " with playerPrefab '" + playerPrefab.name +
                        "'. Press Play, click Host (Server + Client) in one instance and Client in the " +
                        "other — each connection should spawn a walkable body (WASD + mouse-look) that " +
-                       "only its OWNING machine can move or see through.");
+                       "only its OWNING machine can move or see through. Walk either avatar toward the " +
+                       "pins (+Z from spawn) and press B to become the thrower on every machine; aim/power " +
+                       "with the usual bowling controls to fire Step 4's networked throw.");
         }
 
         /// <summary>
@@ -175,6 +180,116 @@ namespace WeeSpurts.Editor
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(playerGo, PlayerPrefabPath);
             Object.DestroyImmediate(playerGo);
             return prefab;
+        }
+
+        /// <summary>
+        /// SPIKE Step 4: the minimal bowling loop needed to test ONE networked
+        /// throw — pins, ball, launcher, match flow/presentation. Reuses the
+        /// SAME BallConfig/LaneConfig/PinConfig/BallBounce/PinBounce assets
+        /// GreyboxSceneBuilder uses (same paths), so tuning is comparable, not
+        /// a guess. No lane/rail geometry (the throw path only reads the
+        /// CONFIG numbers, not any visual mesh), no thrower character, no
+        /// Nuke Shot, no ball-switcher powerups, no scripted camera sequence —
+        /// all out of scope for "one networked throw".
+        /// </summary>
+        private static void BuildBowling()
+        {
+            BallConfig ballConfig = LoadOrCreateAsset<BallConfig>(ProjectRoot + "/ScriptableObjects/BallConfig.asset");
+            LaneConfig laneConfig = LoadOrCreateAsset<LaneConfig>(ProjectRoot + "/ScriptableObjects/LaneConfig.asset");
+            PinConfig pinConfig = LoadOrCreateAsset<PinConfig>(ProjectRoot + "/ScriptableObjects/PinConfig.asset");
+
+            // Offset from the player spawn (origin) so the two don't overlap.
+            Vector3 ballSpawnPos = new Vector3(0f, ballConfig.SpawnHeight, 6f);
+
+            GameObject spawn = new GameObject("BallSpawn");
+            spawn.transform.position = ballSpawnPos;
+
+            GameObject ballGo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            ballGo.name = "BowlingBall";
+            float d = ballConfig.Radius * 2f;
+            ballGo.transform.localScale = new Vector3(d, d, d);
+            ballGo.transform.position = ballSpawnPos;
+            ballGo.AddComponent<Rigidbody>();
+            BowlingBall ball = ballGo.AddComponent<BowlingBall>();
+
+#if UNITY_6000_0_OR_NEWER
+            var ballBounce = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>(ProjectRoot + "/ScriptableObjects/BallBounce.asset");
+#else
+            var ballBounce = AssetDatabase.LoadAssetAtPath<PhysicMaterial>(ProjectRoot + "/ScriptableObjects/BallBounce.asset");
+#endif
+            ballGo.GetComponent<SphereCollider>().sharedMaterial = ballBounce;
+
+            GameObject deckGo = new GameObject("PinDeck");
+            deckGo.transform.position = ballSpawnPos + Vector3.forward * laneConfig.Length;
+            PinDeck deck = deckGo.AddComponent<PinDeck>();
+
+            GameObject pinGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            pinGo.name = "PinTemplate";
+            pinGo.transform.SetParent(deckGo.transform);
+            pinGo.transform.localScale = new Vector3(0.12f, pinConfig.PinHeight * 0.5f, 0.12f);
+            pinGo.transform.localPosition = new Vector3(0f, pinConfig.PinHeight * 0.5f, 0f);
+            // Cylinder primitives attach a CapsuleCollider by default (a round
+            // bottom would make pins wobble over on their own) — same swap
+            // GreyboxSceneBuilder makes.
+            Object.DestroyImmediate(pinGo.GetComponent<CapsuleCollider>());
+            BoxCollider pinCollider = pinGo.AddComponent<BoxCollider>();
+            pinGo.AddComponent<Rigidbody>();
+            Pin pinTemplate = pinGo.AddComponent<Pin>();
+
+#if UNITY_6000_0_OR_NEWER
+            var pinBounce = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>(ProjectRoot + "/ScriptableObjects/PinBounce.asset");
+#else
+            var pinBounce = AssetDatabase.LoadAssetAtPath<PhysicMaterial>(ProjectRoot + "/ScriptableObjects/PinBounce.asset");
+#endif
+            pinCollider.sharedMaterial = pinBounce;
+
+            pinGo.SetActive(false);
+            deck.Initialize(pinConfig, pinTemplate);
+
+            // Bowling camera: ConfigureAimView only — no ThrowCameraSequence.
+            // The seven-beat scripted cinematic is presentation polish, out of
+            // scope for a spike testing throw-sync and drift, not game feel.
+            GameObject camGo = new GameObject("BowlingCamera");
+            Camera cam = camGo.AddComponent<Camera>();
+            camGo.AddComponent<AudioListener>();
+            // Starts disabled, same as the first-person camera: PlayerCameraDirector
+            // is what turns it on, and only for whichever avatar is the thrower.
+            cam.enabled = false;
+            ThrowCamera throwCam = camGo.AddComponent<ThrowCamera>();
+            throwCam.ConfigureAimView(new Vector3(0f, 2.3f, -3.7f), new Vector3(16f, 0f, 0f), ballGo.transform);
+
+            GameObject gameGo = new GameObject("BowlingGame");
+            // NetworkIdentity FIRST — same OnValidate ordering lesson as the
+            // player prefab (BowlingMatchFlow AND BowlingPresentation are both
+            // NetworkBehaviours living on this one object).
+            gameGo.AddComponent<NetworkIdentity>();
+            // GetOrAdd, not AddComponent, and that is load-bearing (same lesson
+            // GreyboxSceneBuilder learned): BallLauncher requires
+            // BowlingPresentation requires BowlingMatchFlow, so adding BallLauncher
+            // FIRST auto-adds the other two via [RequireComponent] — a plain
+            // AddComponent for either of them next would then stack a SECOND
+            // instance on the object, and two BowlingPresentations both running
+            // Update would fight over the same match.
+            BallLauncher launcher = GetOrAdd<BallLauncher>(gameGo);
+            BowlingMatchFlow matchFlow = GetOrAdd<BowlingMatchFlow>(gameGo);
+            BowlingPresentation presentation = GetOrAdd<BowlingPresentation>(gameGo);
+            matchFlow.Configure(ballConfig, laneConfig, ball, deck, launcher, spawn.transform);
+            presentation.Configure(throwCam);
+
+            // No hardcoded thrower, unlike GreyboxSceneBuilder's sandboxAutoStart:
+            // players are spawned dynamically per connection, so there is no
+            // fixed avatar to wire at scene-build time. PlayerAvatar's "B" key
+            // (CmdRequestStartBowling) is this spike's networked equivalent.
+            var presentationSo = new SerializedObject(presentation);
+            presentationSo.FindProperty("sandboxAutoStart").boolValue = false;
+            presentationSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>AddComponent that never stacks a duplicate. See BuildBowling's comment for why this matters here.</summary>
+        private static T GetOrAdd<T>(GameObject go) where T : Component
+        {
+            T existing = go.GetComponent<T>();
+            return existing != null ? existing : go.AddComponent<T>();
         }
 
         private static void Wire(SerializedObject so, string propertyName, Object value)
