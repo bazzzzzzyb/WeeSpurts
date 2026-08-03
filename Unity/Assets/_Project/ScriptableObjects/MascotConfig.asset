@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: MascotConfig
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.MascotConfig
   Opacity: 1
-  DisplayScale: 0.56
+  DisplayScale: 0.7
