@@ -46,7 +46,10 @@ namespace WeeSpurts.Editor
             GameObject floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
             floor.name = "Floor";
             floor.transform.position = new Vector3(0f, -0.5f, 0f);
-            floor.transform.localScale = new Vector3(40f, 1f, 40f); // top face lands at y=0
+            // 60x60, not 40x40: pins sit at z = 6 (ball spawn) + LaneConfig.Length
+            // (18) = 24, which the old 40x40 floor (edge at z=20) didn't reach —
+            // pins and anyone walking toward them fell into the void past that edge.
+            floor.transform.localScale = new Vector3(60f, 1f, 60f); // top face lands at y=0
 
             GameObject lightGo = new GameObject("Directional Light");
             Light light = lightGo.AddComponent<Light>();
