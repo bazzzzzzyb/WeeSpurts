@@ -1,4 +1,5 @@
 using System;
+using Mirror;
 using UnityEngine;
 using WeeSpurts.Bowling;
 using WeeSpurts.Interaction;
@@ -37,25 +38,18 @@ namespace WeeSpurts.Player
     /// Bowling while everyone else is still Roaming, which is exactly the
     /// walkable-alley behaviour Docs/OpenQuestions.md describes.
     ///
-    /// NO NETWORKING CODE HERE — but this is the shape it will take: see
-    /// <see cref="IsLocal"/>.
+    /// NETWORKED (Mirror/mirror-kcp spike, 2026-08-03): see <see cref="isLocalPlayer"/>
+    /// and <see cref="OnStartLocalPlayer"/>.
     /// </summary>
     [DisallowMultipleComponent]
-    public class PlayerAvatar : MonoBehaviour
+    public class PlayerAvatar : NetworkBehaviour
     {
-        /// <summary>
-        /// Is this avatar the one THIS machine's human is driving?
-        ///
-        /// THIS IS THE MIRROR SEAM. Today it's a checkbox that defaults to true
-        /// because there is exactly one avatar in the scene. When Mirror lands,
-        /// PlayerAvatar becomes a NetworkBehaviour and this becomes
-        /// `isLocalPlayer` — nothing else in this class has to change, because
-        /// every input/camera/cursor decision below already asks this question
-        /// first. A remote player's avatar must never grab your cursor or
-        /// switch your camera; that's the bug this flag pre-empts.
-        /// </summary>
-        [Tooltip("Is this the avatar this machine's player controls? Becomes Mirror's isLocalPlayer later. Leave ticked for single-machine testing.")]
-        public bool IsLocal = true;
+        // Was a plain public bool defaulting to true (fail-OPEN — every avatar
+        // would consider itself local). Mirror's own isLocalPlayer defaults to
+        // false until this identity's ownership is confirmed (fail-CLOSED), and
+        // every input/camera/cursor decision below already asked this exact
+        // question, so nothing else in this class had to change — see
+        // OnStartLocalPlayer below for the one addition that DID need to change.
 
         [Header("Mode-owned components (wired by RoamingSetupTool)")]
         // All [SerializeField] because an editor tool wires them, not Play-mode
@@ -99,6 +93,20 @@ namespace WeeSpurts.Player
             if (!_modeApplied) EnterRoaming();
         }
 
+        /// <summary>
+        /// Fires once Mirror has confirmed THIS machine owns this identity —
+        /// unlike Start(), which runs before that is guaranteed. Re-applying
+        /// here is the fix for a predicted spike bug: Start() already ran
+        /// ApplyMode() while isLocalPlayer still read false, which permanently
+        /// disabled firstPersonController/interactor and skipped the cursor for
+        /// the actual local player, with no console error. Start()'s call stays
+        /// in place — non-local avatars and host-side setup still need it.
+        /// </summary>
+        public override void OnStartLocalPlayer()
+        {
+            ApplyMode();
+        }
+
         /// <summary>Hand this player back their legs, their camera and their mouse.</summary>
         public void EnterRoaming()
         {
@@ -131,7 +139,7 @@ namespace WeeSpurts.Player
             _modeApplied = true;
 
             // --- Components that move this transform ------------------------
-            // NOT gated on IsLocal. These are about who is allowed to write the
+            // NOT gated on isLocalPlayer. These are about who is allowed to write the
             // transform, which is true for a remote avatar too (its position
             // will arrive over the network later, but ThrowerAimSlide still
             // drives its slide from replicated aim values).
@@ -146,10 +154,10 @@ namespace WeeSpurts.Player
             if (throwerAimSlide != null) throwerAimSlide.enabled = !roaming;
 
             // --- Local-input components -------------------------------------
-            // Gated on IsLocal: a remote player's avatar must never read THIS
-            // machine's keyboard and mouse.
-            if (firstPersonController != null) firstPersonController.enabled = roaming && IsLocal;
-            if (interactor != null) interactor.enabled = roaming && IsLocal;
+            // Gated on isLocalPlayer: a remote player's avatar must never read
+            // THIS machine's keyboard and mouse.
+            if (firstPersonController != null) firstPersonController.enabled = roaming && isLocalPlayer;
+            if (interactor != null) interactor.enabled = roaming && isLocalPlayer;
 
             // --- Clean-up on the way back to roaming ------------------------
             if (roaming) ResetThrowerModelOffset();
@@ -157,11 +165,11 @@ namespace WeeSpurts.Player
             // --- Cursor ------------------------------------------------------
             // Local only. A remote avatar touching your cursor would be a
             // genuinely baffling bug to track down.
-            if (IsLocal) ApplyCursor(roaming);
+            if (isLocalPlayer) ApplyCursor(roaming);
 
             // Camera switching lives in PlayerCameraDirector, which subscribes
             // to this event. Raised LAST so anything listening sees a fully
-            // applied mode. The director does its own IsLocal check.
+            // applied mode. The director does its own isLocalPlayer check.
             OnModeChanged?.Invoke(Mode);
         }
 

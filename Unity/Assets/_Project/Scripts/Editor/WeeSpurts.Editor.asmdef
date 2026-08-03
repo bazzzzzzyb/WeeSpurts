@@ -2,7 +2,10 @@
     "name": "WeeSpurts.Editor",
     "rootNamespace": "WeeSpurts.Editor",
     "references": [
-        "WeeSpurts.Runtime"
+        "WeeSpurts.Runtime",
+        "Mirror",
+        "Mirror.Transports",
+        "Mirror.Components"
     ],
     "includePlatforms": [
         "Editor"

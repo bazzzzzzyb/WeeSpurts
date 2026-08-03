@@ -71,7 +71,7 @@ namespace WeeSpurts.Player
         {
             // A remote player's avatar must never switch THIS machine's camera.
             // Same guard as the cursor in PlayerAvatar, for the same reason.
-            if (avatar != null && !avatar.IsLocal) return;
+            if (avatar != null && !avatar.isLocalPlayer) return;
 
             bool roaming = mode == ControlMode.Roaming;
 

@@ -1,7 +1,9 @@
 {
     "name": "WeeSpurts.Runtime",
     "rootNamespace": "WeeSpurts",
-    "references": [],
+    "references": [
+        "Mirror"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
