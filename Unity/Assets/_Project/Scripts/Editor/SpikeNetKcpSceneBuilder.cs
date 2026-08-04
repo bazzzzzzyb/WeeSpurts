@@ -265,7 +265,18 @@ namespace WeeSpurts.Editor
             // NetworkIdentity FIRST — same OnValidate ordering lesson as the
             // player prefab (BowlingMatchFlow AND BowlingPresentation are both
             // NetworkBehaviours living on this one object).
-            gameGo.AddComponent<NetworkIdentity>();
+            NetworkIdentity gameIdentity = gameGo.AddComponent<NetworkIdentity>();
+            // FIXED sceneId, not Mirror's auto-generated one (NetworkIdentity.cs:490-540).
+            // Auto-assignment only persists correctly if OnValidate manages to run
+            // and get saved in the SAME pass as SaveScene below — observed
+            // unreliable across repeated rebuilds of a scripted scene (host and
+            // client kept disagreeing on this exact object's sceneId, with
+            // Mirror's own error pointing at exactly this: "Spawn scene object
+            // not found... this only happens if the hierarchy gets out of
+            // sync"). sceneId is public specifically so tooling can do this.
+            // Safe here because BowlingGame is the ONLY NetworkIdentity scene
+            // object in this scene — no duplicate-id risk.
+            gameIdentity.sceneId = 0x1000000000000001;
             // GetOrAdd, not AddComponent, and that is load-bearing (same lesson
             // GreyboxSceneBuilder learned): BallLauncher requires
             // BowlingPresentation requires BowlingMatchFlow, so adding BallLauncher
