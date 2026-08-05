@@ -340,8 +340,31 @@ namespace WeeSpurts.Bowling
             Phase = $"{Turns.CurrentPlayer.DisplayName} — frame {scorer.CurrentFrame + 1}, roll {scorer.RollInFrame + 1}: AIM";
         }
 
+        /// <summary>
+        /// True when no Mirror session (host, server, or client) is running at
+        /// all — e.g. pressing Play directly on a scene that has BowlingGame
+        /// but was never started through NetworkManager. There is no
+        /// NetworkIdentity and no connection in that case, so the generated
+        /// Command/ClientRpc methods below dereference a null netIdentity the
+        /// instant they're called (exactly the NRE out of CmdThrow). Detecting
+        /// this and resolving locally is what makes offline/sandbox testing
+        /// possible without wiring up a NetworkIdentity + host session just to
+        /// test a single-player throw.
+        /// </summary>
+        private bool IsOffline => !NetworkClient.active && !NetworkServer.active;
+
         private void HandleThrow(LaunchParameters p)
         {
+            if (IsOffline)
+            {
+                // No networking running at all — there is no host to route
+                // this through, so resolve it directly on this machine,
+                // acting as its own authority. Skips CmdThrow/RpcResolveThrow
+                // entirely so nothing here touches netIdentity.
+                StartCoroutine(ResolveThrow(p));
+                return;
+            }
+
             // SPIKE Step 4 (Docs/spikes/MirrorKcpSpikeStatus.md): send to the
             // host instead of resolving directly. BallLauncher.OnThrow only
             // ever fires on the actual thrower's own machine (gated by
@@ -406,7 +429,7 @@ namespace WeeSpurts.Bowling
             // below (RpcConfirmPinCount) on the non-host machine's console.
             Debug.Log($"[SpikeThrow] This machine's local physics knocked {knocked} pins.");
 
-            if (!isServer)
+            if (!isServer && !IsOffline)
             {
                 // SPIKE SCOPE, deliberately: clients stop here. No pin-transform
                 // snapping (forcing remote clients' individual Pin objects into
@@ -415,12 +438,18 @@ namespace WeeSpurts.Bowling
                 // the entire "everyone snaps to it" for this pass — a count, not
                 // corrected physics. Full state-snap is a Step 5 finding, not
                 // implemented here.
+                //
+                // Offline is exempted: isServer is false with no session
+                // running at all, but there's no host to defer to either, so
+                // this machine has to keep going and act as its own authority.
                 yield break;
             }
 
             RollOutcome outcome = scorer.AddRoll(knocked);
             Debug.Log($"{Turns.CurrentPlayer.DisplayName} knocked {knocked}. Outcome: {outcome}.");
-            RpcConfirmPinCount(knocked);
+            // Skip the ClientRpc offline too — same netIdentity-is-null reason
+            // CmdThrow is skipped in HandleThrow above.
+            if (!IsOffline) RpcConfirmPinCount(knocked);
 
             switch (outcome)
             {

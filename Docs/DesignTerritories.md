@@ -1,5 +1,39 @@
 # Design Territories — the bones of every mechanic
 
+> ## ⚠️ PARTIALLY SUPERSEDED — read `Docs/Projects.md` first
+>
+> Reviewed by Tony 2026-08-03. This document remains valuable — its core reframe (the connective
+> tissue is **attention**, not coins) stands and is the best idea in it. But four of its proposals
+> were considered and **rejected or changed**. Where this file and `Docs/Projects.md` disagree,
+> **Projects.md wins.**
+>
+> **1. Prop bets on failure archetypes — REJECTED.** Territory 2's core proposal. Ten frames × four
+> players is forty betting decisions a night; that's admin, not a game. The doc names "bet fatigue"
+> as the failure mode and proposes it anyway. **Replaced by:** automatic performance-based payouts
+> (score, rank, strike bonuses) plus a single wager agreed at the start of the round, settled after
+> frame 10. Same spectator payoff, no per-throw interaction cost.
+>
+> **2. Skins is the competitive mode — ADDED, not in this doc.** Frame = skin, ties carry to the next
+> frame. Solves the strike-after-strike runaway problem that betting was reaching for: two players
+> both striking is a tie, so the pot grows instead of someone banking a lead.
+>
+> **3. The night-out ledger / wallet reset — REJECTED.** Territory 1's central conceit. **Coins
+> persist between sessions**, because people should want to come back to their cosmetics. This is
+> knowingly harder — the economy now needs real balancing — but §1's anti-inflation and
+> anti-runaway arguments no longer apply as written. Territory 8's "the alley remembers" idea
+> survives on its own merits, not as the persistence answer.
+>
+> **4. The casino as pressure valve with a negative-EV design law — DOWNGRADED.** The casino is a
+> **dumb coin sink**, structurally identical to the cosmetics shop. It doesn't need to integrate with
+> anything. Negative EV is a tuning default, not a law. The §0 disagreement with `FeelIdeas.md` §G is
+> therefore moot: the lane is the centre because the room orbits the lane, full stop.
+>
+> **Also added since:** an arcade — cabinets with high scores, local single-player toys, nothing
+> syncing but presence and score.
+>
+> Everything else below — the attention spine, the drinking/§8 resolution, the reaction director, the
+> heckling line, the ratings research — stands and is worth reading in full.
+
 *A creative pass, not a production plan. Written 2026-08-03 against everything in the repo — Bible §8/§9 are treated as law, `BowlingFeelIdeas.md` §G decisions (ball return = randomiser, shop = cosmetics-only, host-gated presets) as standing positions I build on and occasionally argue with. Nothing here is decided by being written; each territory ends with what only playing can answer. This file is the index of a series — dig into one territory at a time and log the digs as `Docs/design/<territory>.md`.*
 
 ---

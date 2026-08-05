@@ -96,12 +96,24 @@ namespace WeeSpurts.Editor
         [MenuItem("WeeSpurts/Build Alley Venue Greybox (Standalone Scene)")]
         public static void BuildStandaloneScene()
         {
+            // Same guard as GreyboxSceneBuilder: NewScene below replaces whatever
+            // is CURRENTLY OPEN with no prompt of its own. If that happens to be
+            // a real map (e.g. TonyTestMap.unity) with unsaved edits, those edits
+            // are gone the instant this runs, even though the map's own .unity
+            // file on disk is never touched. This is the standard "do you want
+            // to save changes" dialog; returns false only on Cancel.
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            {
+                Debug.Log("[AlleyGreybox] Build cancelled — current scene has unsaved changes and you chose not to proceed.");
+                return;
+            }
+
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             // The real lane does not exist in this scene, so draw a cosmetic
             // stand-in for it. That is the whole point of the standalone scene:
             // you can see whether the venue lines up with where the lane WILL be,
-            // with zero risk to BowlingAlley.unity.
+            // with zero risk to BowlingTestbed.unity.
             BuildVenue(includePlayableLaneStandIn: true);
 
             var lightGo = new GameObject("Directional Light");

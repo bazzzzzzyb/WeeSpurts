@@ -22,11 +22,30 @@ namespace WeeSpurts.Editor
     public static class GreyboxSceneBuilder
     {
         private const string ProjectRoot = "Assets/_Project";
-        private const string ScenePath = ProjectRoot + "/Scenes/BowlingAlley.unity";
+
+        // Renamed from "BowlingAlley.unity": that name reads like a real level,
+        // and this tool always overwrites whatever is at ScenePath with a fresh
+        // disposable test lane. "Testbed" makes clear on sight that nothing
+        // here is meant to survive — a real map (e.g. TonyTestMap.unity) lives
+        // at its own path and this builder never touches it.
+        private const string ScenePath = ProjectRoot + "/Scenes/BowlingTestbed.unity";
 
         [MenuItem("WeeSpurts/Build Greybox Bowling Scene")]
         public static void Build()
         {
+            // Whatever scene is CURRENTLY OPEN gets replaced by NewScene below
+            // with no prompt of its own — if that happens to be a real map with
+            // unsaved edits, those edits are gone the moment this runs, even
+            // though the map's own .unity file on disk is untouched. This is
+            // the standard "do you want to save changes" dialog (Save / Don't
+            // Save / Cancel); returns false only if the user hits Cancel, in
+            // which case we bail out before anything is touched.
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            {
+                Debug.Log("[Greybox] Build cancelled — current scene has unsaved changes and you chose not to proceed.");
+                return;
+            }
+
             // ----- 1. Config assets (created once, then reused) -----
             BallConfig ballConfig = LoadOrCreateAsset<BallConfig>(ProjectRoot + "/ScriptableObjects/BallConfig.asset");
             LaneConfig laneConfig = LoadOrCreateAsset<LaneConfig>(ProjectRoot + "/ScriptableObjects/LaneConfig.asset");

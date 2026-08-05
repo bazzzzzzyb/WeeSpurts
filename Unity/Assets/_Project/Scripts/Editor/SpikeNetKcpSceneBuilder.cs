@@ -74,8 +74,9 @@ namespace WeeSpurts.Editor
             EnsureFolder(ProjectRoot + "/Scenes");
             EditorSceneManager.SaveScene(scene, ScenePath);
 
-            // Append, don't replace: BowlingAlley.unity is already the sole
-            // Build Settings entry and this spike has no business removing it.
+            // Append, don't replace: the greybox bowling scene (BowlingTestbed.unity)
+            // is already the sole Build Settings entry and this spike has no
+            // business removing it.
             var scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
             if (!scenes.Exists(s => s.path == ScenePath))
                 scenes.Add(new EditorBuildSettingsScene(ScenePath, true));

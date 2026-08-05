@@ -47,7 +47,7 @@ namespace WeeSpurts.Bowling
         [Tooltip("Optional. Where the active thrower stands at the foul line — the avatar is snapped here on their turn. Empty just means the avatar changes mode without being moved.")]
         [SerializeField] private Transform throwingStance;
 
-        [Tooltip("Optional. Which avatar sandboxAutoStart hands the first turn to. Leave empty in scenes with no PlayerAvatar (e.g. BowlingAlley.unity) — the match then starts with nobody's mode touched, exactly as before.")]
+        [Tooltip("Optional. Which avatar sandboxAutoStart hands the first turn to. Leave empty in scenes with no PlayerAvatar (e.g. BowlingTestbed.unity) — the match then starts with nobody's mode touched, exactly as before.")]
         [SerializeField] private PlayerAvatar sandboxThrower;
 
         [Tooltip("Seconds of ←/→ steering lockout at the START of a player's turn, while the 'you're up' camera beat is looking BACK at the thrower and left/right therefore read mirrored ON SCREEN. DEFAULT 0 = off, i.e. steer immediately and live with the mirrored window. Set it to ThrowCameraSequenceConfig's ReturnDuration + ADuration (0.75 + 0.9 = 1.65 at the tuned defaults) to suppress steering until the shot swings down-lane, or 2.45 to also cover the swing itself. Power and spin are never locked. NOTE: this is unrelated to a NEGATIVE HalfLaneWidth, which inverts aim permanently — see BowlingMatchFlow.HalfLaneWidth.")]
