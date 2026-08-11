@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using Mirror;
 using UnityEngine;
+using WeeSpurts.Core;
 using WeeSpurts.Gameplay;
 
 namespace WeeSpurts.Bowling
@@ -225,7 +226,25 @@ namespace WeeSpurts.Bowling
         {
             Turns = new TurnManager();
             for (int i = 0; i < laneConfig.DebugPlayerCount; i++)
-                Turns.AddPlayer(new PlayerData((ulong)i, $"Player {i + 1}"));
+            {
+                var player = new PlayerData((ulong)i, $"Player {i + 1}");
+                Turns.AddPlayer(player);
+
+                // Put them on the session's books so the bar, the card table
+                // and (later) the betting layer will actually serve them.
+                // EnsurePlayer is idempotent, so a second match does NOT reset
+                // anyone's balance — that is the whole point of the ledger
+                // living on GameManager rather than here (Tony, 2026-08-04:
+                // winnings carry between matches, like a real alley).
+                //
+                // NULL-GUARDED because BowlingAlley.unity's sandbox path can be
+                // played without a GameManager in the scene. No manager means
+                // no economy, and the shops simply refuse everyone rather than
+                // this throwing on scene load and taking bowling down with it —
+                // the throw path must never depend on the slop layer.
+                if (GameManager.Instance != null)
+                    GameManager.Instance.EnsurePlayer(player.Id);
+            }
 
             // Cache the normal green zone BEFORE anything (a Nuke throw) might
             // override it via launcher.SetGreenZone, so a Nuke roll can restore
@@ -350,8 +369,13 @@ namespace WeeSpurts.Bowling
         /// this and resolving locally is what makes offline/sandbox testing
         /// possible without wiring up a NetworkIdentity + host session just to
         /// test a single-player throw.
+        ///
+        /// Delegates to <see cref="WeeSpurts.Core.NetSession.IsOffline"/> —
+        /// this class defined the rule first, but PlayerAvatar now needs the
+        /// identical check, so the definition itself lives there and this is
+        /// the one place in this file that names it.
         /// </summary>
-        private bool IsOffline => !NetworkClient.active && !NetworkServer.active;
+        private bool IsOffline => WeeSpurts.Core.NetSession.IsOffline;
 
         private void HandleThrow(LaunchParameters p)
         {
@@ -429,7 +453,15 @@ namespace WeeSpurts.Bowling
             // below (RpcConfirmPinCount) on the non-host machine's console.
             Debug.Log($"[SpikeThrow] This machine's local physics knocked {knocked} pins.");
 
-            if (!isServer && !IsOffline)
+            // IsOffline MUST be checked first — same short-circuit reason as
+            // everywhere else in this class and PlayerAvatar.IsThisMachinesPlayer:
+            // isServer reads netIdentity.isServer, and a scene with no
+            // NetworkIdentity (BowlingAlley.unity/TestVenue.unity today) has a
+            // null netIdentity, so evaluating isServer BEFORE IsOffline throws —
+            // exactly the NRE this ordering used to produce every second throw
+            // (found 2026-08-04: the coroutine died here, so BeginRoll() never
+            // ran again — camera frozen, frame never reset, no further throws).
+            if (!IsOffline && !isServer)
             {
                 // SPIKE SCOPE, deliberately: clients stop here. No pin-transform
                 // snapping (forcing remote clients' individual Pin objects into
@@ -439,9 +471,9 @@ namespace WeeSpurts.Bowling
                 // corrected physics. Full state-snap is a Step 5 finding, not
                 // implemented here.
                 //
-                // Offline is exempted: isServer is false with no session
-                // running at all, but there's no host to defer to either, so
-                // this machine has to keep going and act as its own authority.
+                // Offline is exempted: with no session running at all there's no
+                // host to defer to, so this machine has to keep going and act as
+                // its own authority.
                 yield break;
             }
 

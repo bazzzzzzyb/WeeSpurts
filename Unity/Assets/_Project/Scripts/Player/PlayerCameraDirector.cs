@@ -87,7 +87,12 @@ namespace WeeSpurts.Player
         {
             // A remote player's avatar must never switch THIS machine's camera.
             // Same guard as the cursor in PlayerAvatar, for the same reason.
-            if (avatar != null && !avatar.isLocalPlayer) return;
+            // IsThisMachinesPlayer rather than bare isLocalPlayer: offline (no
+            // Mirror session, no NetworkIdentity on the scene's Player object)
+            // bare isLocalPlayer throws on a null netIdentity — see
+            // PlayerAvatar's own doc comment on the property. While a session
+            // IS running this is byte-for-byte isLocalPlayer.
+            if (avatar != null && !avatar.IsThisMachinesPlayer) return;
 
             bool roaming = mode == ControlMode.Roaming;
 

@@ -1,0 +1,41 @@
+;THUNDER LANES floorplan. 1 cell = 1 metre. Lines starting with ';' are ignored.
+;Rows = X, north (lane 1) at TOP.  Cols = Z, back wall at LEFT, pins at RIGHT.
+;The 'X' row IS the playable lane (x=0). The A/L boundary IS the foul line (z=0).
+;  #wall  .floor  :concourse  L lane  X PLAYABLE lane  A approach(KEEP CLEAR)
+;  r ballreturn  p sunken pit  g lounge couches  b bar  s snack  h shoes  o proshop
+;  c casino(raised)  w stair  k cardseller  a arcade cab  _ arcade floor
+;  t restroom  e entrance  m pinsetter  + backofhouse
+######################################################
+#++ccccccc:::::::kkkkk...........................mmmm#
+#++ccccccc:::::::................................mmmm#
+#++ccccccc:::::::................................mmmm#
+#++ccccccc:::::::ppppprrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++cccccww:::::::ppppprrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++.......ggg::::ppppprrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++......bggg::::.....rrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++......bggg::::ppppprrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++......b:::::::ppppprrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++......b:::::::ppppprrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++......b:::::::.....rrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++......bggg::::ppppprrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++.......ggg::::ppppprrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++.......ggg::::ppppprrAAAAXXXXXXXXXXXXXXXXXXXXXmmmm#
+#++......s:::::::.....rrAAAAXXXXXXXXXXXXXXXXXXXXXmmmm#
+#++......s:::::::ppppprrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++......s:::::::ppppprrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++......sggg::::ppppprrAAAALLLLLLLLLLLLLLLLLLLLLmmmm#
+#++......sggg::::.....rr##############################
+#++.......ggg::::......#                              
+#++......h::::::_aaaaa.#                              
+#++......h::::::______.#                              
+#++......h::::::______.#                              
+#++......h::::::______.#                              
+#++......h::::::______.#                              
+#++.......::::::______.#                              
+#++.......::::::_aaaaa.#                              
+#++eeee..o:::::::......#                              
+#++eeee..o:::::::ttttt.#                              
+#++eeee..o:::::::ttttt.#                              
+#++eeee..o:::::::ttttt.#                              
+#++eeee...:::::::ttttt.#                              
+########################                              

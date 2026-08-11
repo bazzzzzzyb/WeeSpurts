@@ -2,6 +2,7 @@ using System;
 using Mirror;
 using UnityEngine;
 using WeeSpurts.Bowling;
+using WeeSpurts.Core;
 using WeeSpurts.Interaction;
 
 namespace WeeSpurts.Player
@@ -74,6 +75,24 @@ namespace WeeSpurts.Player
         public ControlMode Mode { get; private set; } = ControlMode.Roaming;
 
         /// <summary>
+        /// "Does THIS machine own this avatar" — the offline-aware version of
+        /// isLocalPlayer that every input/camera/cursor check below should use
+        /// instead. NetSession.IsOffline MUST be checked first: when no Mirror
+        /// session is running at all there is no NetworkIdentity, so bare
+        /// isLocalPlayer dereferences a null netIdentity and throws (the exact
+        /// bug this property exists to fix — see the class comment's NETWORKED
+        /// line). The short-circuit means isLocalPlayer is never evaluated in
+        /// that case.
+        ///
+        /// FAIL-OPEN ONLY WHEN THERE IS NO SESSION AT ALL — this does NOT
+        /// relax PlayerAvatar's fail-closed isLocalPlayer decision (see this
+        /// class's top comment) for an actual networked game. The instant any
+        /// Mirror session exists (host, server, or client), NetSession.IsOffline
+        /// is false and this property is byte-for-byte isLocalPlayer, unchanged.
+        /// </summary>
+        public bool IsThisMachinesPlayer => NetSession.IsOffline || isLocalPlayer;
+
+        /// <summary>
         /// Fired AFTER a mode change has been fully applied. This is how systems
         /// that are not mode-owned components (the camera director today, a HUD
         /// tomorrow) react without anyone reaching into this class's business.
@@ -112,7 +131,19 @@ namespace WeeSpurts.Player
             // out of scope for this spike. Only the owning client can request
             // this ([Command]'s default requiresAuthority = true), and only
             // while roaming — no point re-requesting mid-throw.
-            if (isLocalPlayer && Mode == ControlMode.Roaming && Input.GetKeyDown(KeyCode.B))
+            //
+            // !NetSession.IsOffline FIRST, and it is not optional: offline,
+            // IsThisMachinesPlayer is deliberately TRUE (that is the whole
+            // point of the fallback), so without this guard pressing B in
+            // TestVenue/BowlingAlley calls a [Command] with no session behind
+            // it — and a generated Command dereferences a null netIdentity the
+            // instant it runs. Same short-circuit discipline as everywhere
+            // else that touches Mirror state. There is no offline equivalent
+            // of "ask the host to make me the thrower" because offline there
+            // is no host; the scenes that need a match either auto-start it
+            // (BowlingAlley's sandboxAutoStart) or use the lane kiosk.
+            if (!NetSession.IsOffline && IsThisMachinesPlayer
+                && Mode == ControlMode.Roaming && Input.GetKeyDown(KeyCode.B))
                 CmdRequestStartBowling();
         }
 
@@ -192,10 +223,13 @@ namespace WeeSpurts.Player
             if (throwerAimSlide != null) throwerAimSlide.enabled = !roaming;
 
             // --- Local-input components -------------------------------------
-            // Gated on isLocalPlayer: a remote player's avatar must never read
-            // THIS machine's keyboard and mouse.
-            if (firstPersonController != null) firstPersonController.enabled = roaming && isLocalPlayer;
-            if (interactor != null) interactor.enabled = roaming && isLocalPlayer;
+            // Gated on IsThisMachinesPlayer (offline-aware isLocalPlayer): a
+            // remote player's avatar must never read THIS machine's keyboard
+            // and mouse, and offline there is no remote anything to guard
+            // against, so the check just needs to not crash on a null
+            // netIdentity.
+            if (firstPersonController != null) firstPersonController.enabled = roaming && IsThisMachinesPlayer;
+            if (interactor != null) interactor.enabled = roaming && IsThisMachinesPlayer;
 
             // --- Clean-up on the way back to roaming ------------------------
             if (roaming) ResetThrowerModelOffset();
@@ -203,11 +237,11 @@ namespace WeeSpurts.Player
             // --- Cursor ------------------------------------------------------
             // Local only. A remote avatar touching your cursor would be a
             // genuinely baffling bug to track down.
-            if (isLocalPlayer) ApplyCursor(roaming);
+            if (IsThisMachinesPlayer) ApplyCursor(roaming);
 
             // Camera switching lives in PlayerCameraDirector, which subscribes
             // to this event. Raised LAST so anything listening sees a fully
-            // applied mode. The director does its own isLocalPlayer check.
+            // applied mode. The director does its own IsThisMachinesPlayer check.
             OnModeChanged?.Invoke(Mode);
         }
 

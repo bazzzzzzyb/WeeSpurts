@@ -66,7 +66,11 @@ namespace WeeSpurts.Bowling
         // "Is this MY avatar" — identity only, no turn concept. True in every scene
         // with no PlayerAvatar wired at all (today's sandbox/test scenes keep working
         // unchanged), and true when the wired avatar is the local player's.
-        private bool IsMyAvatar => _thrower == null || _thrower.isLocalPlayer;
+        // PlayerAvatar.IsThisMachinesPlayer rather than bare isLocalPlayer: offline
+        // (no Mirror session, no NetworkIdentity on the scene's Player object) bare
+        // isLocalPlayer throws on a null netIdentity — see PlayerAvatar's own doc
+        // comment. While a session IS running this is byte-for-byte isLocalPlayer.
+        private bool IsMyAvatar => _thrower == null || _thrower.IsThisMachinesPlayer;
 
         // "Is this MY avatar AND is it MY turn" — the gate for anything that composes
         // or affects the actual throw (aim, spin, power, ball selection, frame reset).

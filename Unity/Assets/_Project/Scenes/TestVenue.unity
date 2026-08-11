@@ -21771,7 +21771,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5084e94dcf02640f08382327b622e288, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Player.PlayerAvatar
-  IsLocal: 1
+  syncMethod: 0
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   characterController: {fileID: 1746238797}
   firstPersonController: {fileID: 1746238795}
   interactor: {fileID: 1746238799}
@@ -22903,6 +22906,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: facb32832ad2244d39d3b9c1be4874b1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.BowlingGameController
+  syncMethod: 0
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   ballConfig: {fileID: 11400000, guid: b9ce24e00317f4338aa0d16e1727f7a4, type: 2}
   laneConfig: {fileID: 11400000, guid: 27fa5e01742214b70adfbd31f36b6490, type: 2}
   ball: {fileID: 1708011249}
@@ -22999,6 +23006,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7943d5237d51467197c098d8e7792af, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.BowlingPresentation
+  syncMethod: 0
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   throwCamera: {fileID: 112455902}
   throwReactionBehaviour: {fileID: 1870194525}
   nukeResolver: {fileID: 657046963}

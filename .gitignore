@@ -40,6 +40,7 @@ Unity/Assets/09RetroBowl.meta
 *.csproj
 *.unityproj
 *.sln
+*.slnx
 *.suo
 *.tmp
 *.user
@@ -61,4 +62,10 @@ Unity/Assets/ThirdParty/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 .claude/settings.local.json
+
+# Windows shortcuts / editor test builds accidentally dropped in the repo root
+*.lnk
+Unity/OutPut*/
+Unity/MirrorExamplesPipelineConverted.txt

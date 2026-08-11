@@ -29,6 +29,13 @@ A system is not "done" because code exists. It's done when it meets these criter
 - [ ] Then works networked: active player throws, all clients see the same result, host authoritative.
 - [ ] Disconnect mid-turn doesn't freeze the game.
 
+## [4b] Roaming / Player Movement
+Supports [4] Bowling and the §7 walkable-alley hypothesis in `GameBible.md`; not yet promoted to its own numbered system since §7 is still a candidate, not a locked pillar.
+- [ ] Player can walk, look and interact in a venue scene (`PlayerAvatar` + `FirstPersonController` + `PlayerInteractor`), and hands off cleanly between Roaming and `ControlMode.Bowling` at the foul line and back.
+- [ ] Exactly one camera and one input source is active per machine at a time (`PlayerCameraDirector`); a remote avatar never touches this machine's camera, cursor or keyboard.
+- [ ] Works single-machine first (today, via `NetSession.IsOffline` / `PlayerAvatar.IsThisMachinesPlayer` — see `Networking.md`); then works networked with every non-active player visibly roaming while one bowls. Pattern confirmed by the mirror-kcp spike; not yet ported to `main`.
+- [ ] Walkable venue is provably navigable for the hypothesis test — reachable, no unclassified circulation gaps (`AlleyCirculationAudit`).
+
 ## [5] Menu / Lobby UI
 - [ ] All core screens from `UI.md` exist and are controller-navigable.
 - [ ] A new player reaches an online game without being told how.
