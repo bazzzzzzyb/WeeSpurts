@@ -18,6 +18,15 @@ namespace WeeSpurts.Bowling
         [SerializeField] private Vector3 aimViewEuler;
         [SerializeField] private Vector3 followOffset = new Vector3(0f, 1.6f, -2.5f);
         [SerializeField] private float followSmoothTime = 0.25f;
+
+        [Tooltip("Optional. Defines this lane's own down-lane/lateral axes, so followOffset's X/Z (lateral/down-lane) and the LookAt below still mean the same thing on a lane that doesn't run along world Z. Leave empty for the default world Z/X axes — every lane GreyboxSceneBuilder generates.")]
+        [SerializeField] private LaneFrame lane;
+
+        // Null `lane` -> world Z/X, byte-identical to this class's behaviour
+        // before LaneFrame existed. See LaneFrame's class comment.
+        private Vector3 LaneForward => lane != null ? lane.Forward : Vector3.forward;
+        private Vector3 LaneRight => lane != null ? lane.Right : Vector3.right;
+        private Vector3 LaneOffset(Vector3 offset) => LaneRight * offset.x + Vector3.up * offset.y + LaneForward * offset.z;
         // Slower than followSmoothTime on purpose: the Nuke Shot's rising-sphere
         // chase (FollowRising) should read as a distinct, more deliberate camera
         // move than the fast normal ball-chase (FollowBall), not identical to it.
@@ -93,6 +102,9 @@ namespace WeeSpurts.Bowling
             _ballTarget = ball;
             SnapToAimView();
         }
+
+        /// <summary>Wires this lane's own axes. See LaneFrame's class comment. Leave unset for the default world Z/X axes.</summary>
+        public void SetLane(LaneFrame laneFrame) => lane = laneFrame;
 
         public void SnapToAimView()
         {
@@ -205,9 +217,9 @@ namespace WeeSpurts.Bowling
             }
             else if (_following && followTarget != null)
             {
-                Vector3 desired = followTarget.position + followOffset;
+                Vector3 desired = followTarget.position + LaneOffset(followOffset);
                 _basePosition = Vector3.SmoothDamp(_basePosition, desired, ref _velocity, _activeFollowSmoothTime);
-                transform.LookAt(followTarget.position + Vector3.forward * 1.5f);
+                transform.LookAt(followTarget.position + LaneForward * 1.5f);
             }
             else if (!_staticHold)
             {

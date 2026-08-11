@@ -34,10 +34,10 @@ namespace WeeSpurts.Tests
             return h;
         }
 
-        private static CoinLedger Ledger(int coins = 1000)
+        private static TicketLedger Ledger(int tickets = 1000)
         {
-            var l = new CoinLedger();
-            l.Register(ALICE, coins);
+            var l = new TicketLedger();
+            l.Register(ALICE, tickets);
             return l;
         }
 
@@ -455,6 +455,311 @@ namespace WeeSpurts.Tests
             Assert.GreaterOrEqual(r.DeckCount, 1);
             Assert.GreaterOrEqual(r.BlackjackPayoutDenominator, 1);
             Assert.Less(r.ReshuffleBelowCards, r.DeckCount * 52);
+        }
+
+        // ---------------------------------------------------------------
+        // Double-down and splits (Tony's 2026-08-11 executive-day override —
+        // see Docs/GameBible.md's change log). Same invariant-testing
+        // philosophy as the rest of this file: the shoe is shuffled, so
+        // these loop looking for the situation under test (a matched pair, a
+        // pair of Aces, a non-terminal hit) rather than assuming a seed lands
+        // on it, exactly like Push_ReturnsExactlyTheStake and
+        // Blackjack_PaysThreeToTwo already do above.
+        // ---------------------------------------------------------------
+
+        /// <summary>Hits under 17 then stands — the same fixed strategy the money-invariant tests above use.</summary>
+        private static void PlayOutSimple(BlackjackTable table, TicketLedger ledger)
+        {
+            while (table.Phase == BlackjackPhase.PlayerTurn && table.PlayerHand.Total < 17) table.Hit(ledger);
+            if (table.Phase == BlackjackPhase.PlayerTurn) table.Stand(ledger);
+        }
+
+        [Test]
+        public void DoubleAndSplit_BeforeDealing_DoNothing()
+        {
+            var table = new BlackjackTable(Rules(), seed: 1);
+            Assert.IsFalse(table.Double(Ledger()));
+            Assert.IsFalse(table.Split(Ledger()));
+        }
+
+        [Test]
+        public void Double_OnFirstTwoCards_TakesASecondStakeAndDealsOneCardThenAutoStands()
+        {
+            var table = new BlackjackTable(Rules(), seed: 3);
+            var ledger = Ledger(100000);
+
+            DealOutcome outcome;
+            do { outcome = table.Deal(ledger, ALICE, 20); } while (table.Phase != BlackjackPhase.PlayerTurn);
+            Assert.AreEqual(DealOutcome.Dealt, outcome);
+
+            int balanceBeforeDouble = ledger.BalanceOf(ALICE);
+            bool doubled = table.Double(ledger);
+
+            Assert.IsTrue(doubled);
+            Assert.AreEqual(3, table.PlayerHands[0].Count, "double deals exactly one card");
+            Assert.AreEqual(balanceBeforeDouble - 20, ledger.BalanceOf(ALICE), "the second stake is taken immediately");
+            Assert.AreEqual(BlackjackPhase.Settled, table.Phase, "double auto-stands and resolves a solo hand");
+        }
+
+        [Test]
+        public void Double_AfterHitting_IsIllegalAndChargesNothing()
+        {
+            var table = new BlackjackTable(Rules(), seed: 5);
+            var ledger = Ledger(100000);
+            bool tested = false;
+
+            for (int round = 0; round < 500 && !tested; round++)
+            {
+                if (table.Deal(ledger, ALICE, 20) != DealOutcome.Dealt) break;
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue; // resolved by a natural
+
+                table.Hit(ledger);
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue; // that hit finished the hand
+
+                int before = ledger.BalanceOf(ALICE);
+                Assert.IsFalse(table.Double(ledger), "double is legal only on the first two cards");
+                Assert.AreEqual(before, ledger.BalanceOf(ALICE));
+                tested = true;
+            }
+
+            Assert.IsTrue(tested, "500 rounds should include at least one non-terminal hit to test against");
+        }
+
+        [Test]
+        public void Split_OnUnmatchedFirstTwoCards_IsIllegalAndChargesNothing()
+        {
+            var table = new BlackjackTable(Rules(), seed: 21);
+            var ledger = Ledger(100000);
+            bool tested = false;
+
+            for (int round = 0; round < 200 && !tested; round++)
+            {
+                if (table.Deal(ledger, ALICE, 20) != DealOutcome.Dealt) break;
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue;
+
+                BlackjackHand hand = table.PlayerHands[0];
+                if (hand.Cards[0].Rank == hand.Cards[1].Rank) { table.Stand(ledger); continue; }
+
+                int before = ledger.BalanceOf(ALICE);
+                Assert.IsFalse(table.Split(ledger));
+                Assert.AreEqual(before, ledger.BalanceOf(ALICE));
+                Assert.AreEqual(1, table.PlayerHands.Count);
+                table.Stand(ledger);
+                tested = true;
+            }
+
+            Assert.IsTrue(tested, "200 rounds should include at least one unmatched starting hand");
+        }
+
+        [Test]
+        public void Split_OnMatchedPair_TakesASecondStakeAndCreatesTwoHands()
+        {
+            var table = new BlackjackTable(Rules(), seed: 7);
+            var ledger = Ledger(100000);
+            bool tested = false;
+
+            for (int round = 0; round < 3000 && !tested; round++)
+            {
+                if (table.Deal(ledger, ALICE, 20) != DealOutcome.Dealt) break;
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue;
+
+                BlackjackHand hand = table.PlayerHands[0];
+                if (hand.Cards[0].Rank != hand.Cards[1].Rank) { PlayOutSimple(table, ledger); continue; }
+
+                int before = ledger.BalanceOf(ALICE);
+                bool split = table.Split(ledger);
+
+                Assert.IsTrue(split);
+                Assert.AreEqual(2, table.PlayerHands.Count);
+                Assert.AreEqual(before - 20, ledger.BalanceOf(ALICE), "the second stake is taken immediately");
+                Assert.IsTrue(table.HasSplit);
+                tested = true;
+            }
+
+            Assert.IsTrue(tested, "3000 rounds should include at least one matched starting pair");
+        }
+
+        [Test]
+        public void Split_ASecondTime_IsIllegal_NoReSplitting()
+        {
+            var table = new BlackjackTable(Rules(), seed: 33);
+            var ledger = Ledger(1_000_000);
+            bool tested = false;
+
+            for (int round = 0; round < 3000 && !tested; round++)
+            {
+                if (table.Deal(ledger, ALICE, 20) != DealOutcome.Dealt) break;
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue;
+
+                BlackjackHand hand = table.PlayerHands[0];
+                if (hand.Cards[0].Rank != hand.Cards[1].Rank) { PlayOutSimple(table, ledger); continue; }
+
+                Assert.IsTrue(table.Split(ledger));
+                if (table.Phase != BlackjackPhase.PlayerTurn)
+                {
+                    tested = true; // a forced ace-split auto-resolved before a re-split was even possible
+                    break;
+                }
+
+                Assert.IsFalse(table.Split(ledger), "no re-splitting, even if the new hand happens to match again");
+
+                PlayOutSimple(table, ledger);
+                if (table.Phase == BlackjackPhase.PlayerTurn) PlayOutSimple(table, ledger);
+                tested = true;
+            }
+
+            Assert.IsTrue(tested, "3000 rounds should include at least one split to test against");
+        }
+
+        [Test]
+        public void SplitAces_DealExactlyOneCardEachAndAutoResolve_NoFurtherAction()
+        {
+            var table = new BlackjackTable(Rules(), seed: 41);
+            var ledger = Ledger(1_000_000);
+            bool tested = false;
+
+            for (int round = 0; round < 8000 && !tested; round++)
+            {
+                if (table.Deal(ledger, ALICE, 20) != DealOutcome.Dealt) break;
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue;
+
+                BlackjackHand hand = table.PlayerHands[0];
+                if (hand.Cards[0].Rank != Rank.Ace || hand.Cards[1].Rank != Rank.Ace)
+                {
+                    PlayOutSimple(table, ledger);
+                    continue;
+                }
+
+                Assert.IsTrue(table.Split(ledger));
+                Assert.AreEqual(2, table.PlayerHands[0].Count, "split aces get exactly one card each");
+                Assert.AreEqual(2, table.PlayerHands[1].Count);
+                Assert.AreEqual(BlackjackPhase.Settled, table.Phase, "split aces auto-resolve with no further player action");
+                Assert.AreEqual(2, table.LastRoundResults.Count);
+                tested = true;
+            }
+
+            Assert.IsTrue(tested, "8000 rounds should include at least one starting pair of Aces");
+        }
+
+        [Test]
+        public void SplitRound_SettlesBothHandsIndependently_AndMovesTheLedgerByExactlyTheirCombinedNet()
+        {
+            var table = new BlackjackTable(Rules(), seed: 11);
+            var ledger = Ledger(1_000_000);
+            int splitRoundsChecked = 0;
+
+            for (int round = 0; round < 3000 && splitRoundsChecked < 5; round++)
+            {
+                // Captured BEFORE the deal, not before the split — expectedNet
+                // below sums BOTH hands' Net (each already relative to its own
+                // stake), so the baseline must predate every stake this round
+                // takes, or hand 0's original stake gets subtracted twice.
+                int before = ledger.BalanceOf(ALICE);
+                int circBefore = ledger.TotalInCirculation();
+
+                if (table.Deal(ledger, ALICE, 20) != DealOutcome.Dealt) break;
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue;
+
+                BlackjackHand hand = table.PlayerHands[0];
+                if (hand.Cards[0].Rank != hand.Cards[1].Rank) { PlayOutSimple(table, ledger); continue; }
+
+                Assert.IsTrue(table.Split(ledger));
+
+                while (table.Phase == BlackjackPhase.PlayerTurn)
+                {
+                    if (table.PlayerHand.Total < 17) table.Hit(ledger);
+                    else table.Stand(ledger);
+                }
+
+                Assert.AreEqual(BlackjackPhase.Settled, table.Phase);
+                Assert.AreEqual(2, table.LastRoundResults.Count, "a split round must report a result per hand");
+
+                int expectedNet = 0;
+                for (int i = 0; i < table.LastRoundResults.Count; i++) expectedNet += table.LastRoundResults[i].Net;
+
+                Assert.AreEqual(before + expectedNet, ledger.BalanceOf(ALICE),
+                                "the ledger must move by exactly the sum of both hands' nets");
+                Assert.AreEqual(circBefore + expectedNet, ledger.TotalInCirculation(),
+                                "circulation must move by exactly the round's total net");
+
+                splitRoundsChecked++;
+            }
+
+            Assert.Greater(splitRoundsChecked, 0, "3000 rounds should include at least one split round");
+        }
+
+        [Test]
+        public void SplitHand_CanBustWhileTheOtherWins()
+        {
+            var table = new BlackjackTable(Rules(), seed: 13);
+            var ledger = Ledger(1_000_000);
+            bool found = false;
+
+            for (int round = 0; round < 5000 && !found; round++)
+            {
+                if (table.Deal(ledger, ALICE, 20) != DealOutcome.Dealt) break;
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue;
+
+                BlackjackHand hand = table.PlayerHands[0];
+                if (hand.Cards[0].Rank != hand.Cards[1].Rank) { PlayOutSimple(table, ledger); continue; }
+
+                Assert.IsTrue(table.Split(ledger));
+
+                // Hand 0: hit recklessly to encourage a bust. Hand 1: stand immediately.
+                while (table.Phase == BlackjackPhase.PlayerTurn)
+                {
+                    if (table.ActiveHandIndex == 0) table.Hit(ledger);
+                    else table.Stand(ledger);
+                }
+
+                if (table.LastRoundResults.Count != 2) continue;
+
+                BlackjackRound r0 = table.LastRoundResults[0];
+                BlackjackRound r1 = table.LastRoundResults[1];
+
+                if (r0.Outcome == BlackjackOutcome.PlayerBust &&
+                    (r1.Outcome == BlackjackOutcome.PlayerWin || r1.Outcome == BlackjackOutcome.DealerBust))
+                {
+                    Assert.AreEqual(0, r0.Returned);
+                    Assert.AreEqual(-20, r0.Net);
+                    Assert.Greater(r1.Net, 0);
+                    found = true;
+                }
+            }
+
+            Assert.IsTrue(found, "5000 split rounds (hand 0 hitting recklessly, hand 1 standing) should find at least one bust-vs-win pair");
+        }
+
+        [Test]
+        public void SplitHandReaching21_PaysEvenMoney_NeverTheBlackjackBonus()
+        {
+            var table = new BlackjackTable(Rules(), seed: 51);
+            var ledger = Ledger(1_000_000);
+            bool tested = false;
+
+            for (int round = 0; round < 8000 && !tested; round++)
+            {
+                if (table.Deal(ledger, ALICE, 20) != DealOutcome.Dealt) break;
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue;
+
+                BlackjackHand hand = table.PlayerHands[0];
+                if (hand.Cards[0].Rank != hand.Cards[1].Rank) { PlayOutSimple(table, ledger); continue; }
+
+                Assert.IsTrue(table.Split(ledger));
+                while (table.Phase == BlackjackPhase.PlayerTurn) table.Stand(ledger);
+
+                for (int i = 0; i < table.LastRoundResults.Count; i++)
+                {
+                    BlackjackRound r = table.LastRoundResults[i];
+                    if (r.PlayerTotal != 21 || r.Outcome != BlackjackOutcome.PlayerWin) continue;
+
+                    Assert.AreEqual(r.Stake * 2, r.Returned,
+                                    "post-split 21 pays even money (2x stake), never the 3:2 blackjack bonus");
+                    tested = true;
+                }
+            }
+
+            Assert.IsTrue(tested, "8000 split rounds should include at least one split hand standing on 21 and winning");
         }
     }
 }

@@ -21,6 +21,9 @@ namespace WeeSpurts.Bowling
         /// <summary>Fired once per throw when the ball stops (or times out).</summary>
         public event Action OnSettled;
 
+        [Tooltip("Optional. Defines this lane's own down-lane/lateral axes. Leave empty for the default world Z/X axes — every lane GreyboxSceneBuilder generates.")]
+        [SerializeField] private LaneFrame lane;
+
         private Rigidbody _rb;
         private Collider _collider;
         private Renderer _renderer;
@@ -29,8 +32,15 @@ namespace WeeSpurts.Bowling
         private float _throwStartTime;
         private float _slowSince = -1f;
         private Vector2 _spin;      // player-dialled 2D spin (see SpinModel)
-        private float _launchZ;     // down-lane origin for the spin ramp, captured at release
+        private float _launchDist;  // down-lane origin for the spin ramp, captured at release
         private Vector3 _launchDir; // stored so topspin's forward drive can't feed back on itself
+
+        // Null `lane` -> world Z/X, byte-identical to this class's behaviour
+        // before LaneFrame existed. See LaneFrame's class comment.
+        private Vector3 LaneForward => lane != null ? lane.Forward : Vector3.forward;
+        private Vector3 LaneRight => lane != null ? lane.Right : Vector3.right;
+        private float DistanceDownLane(Vector3 worldPosition) =>
+            lane != null ? lane.DistanceAlong(worldPosition) : worldPosition.z;
         private float _hookForce; // precomputed sign+magnitude Hook force, set once in Launch()
         private float _wobblePhase; // radians, seeded per-throw so the weave differs per Seed
         private float _wobbleElapsed; // seconds, accumulated from Time.fixedDeltaTime (NOT Time.time — see FixedUpdate)
@@ -115,6 +125,9 @@ namespace WeeSpurts.Bowling
         /// </summary>
         public void SetVisible(bool visible) => _renderer.enabled = visible;
 
+        /// <summary>Wires this lane's own axes. See LaneFrame's class comment. Leave unset for the default world Z/X axes.</summary>
+        public void SetLane(LaneFrame laneFrame) => lane = laneFrame;
+
         /// <summary>Place the ball at the start position, frozen, ready to throw.</summary>
         public void ResetForThrow(Vector3 position)
         {
@@ -145,17 +158,17 @@ namespace WeeSpurts.Bowling
                 // Hook/Cone forward-mistiming curve, the ball just flies backward.
                 // Hand-placed, not derived from the smooth chaos curve — skip that
                 // machinery entirely for this branch.
-                Vector3 backDir = Quaternion.Euler(0f, p.AngleDegrees, 0f) * Vector3.back;
+                Vector3 backDir = Quaternion.Euler(0f, p.AngleDegrees, 0f) * -LaneForward;
                 BallVelocity = backDir * config.MinLaunchSpeed;
-                _rb.angularVelocity = new Vector3(-config.MinLaunchSpeed / Mathf.Max(0.01f, config.Radius), 0f, 0f);
+                _rb.angularVelocity = LaneRight * (-config.MinLaunchSpeed / Mathf.Max(0.01f, config.Radius));
                 _spin = Vector2.zero;
-                _launchZ = transform.position.z;
+                _launchDist = DistanceDownLane(transform.position);
                 _launchDir = backDir;
                 _hookForce = 0f;
                 // State hygiene: this early-return branch skips the non-fumble path
                 // below that normally resets these. Currently harmless (FixedUpdate's
-                // wobble force is gated on BallVelocity.z > 0.5f, and a fumble's
-                // velocity.z is negative, so stale values are never read) — but reset
+                // wobble force is gated on velocityDownLane > 0.5f, and a fumble
+                // travels backward, so stale values are never read) — but reset
                 // anyway so this stays correct if that guard ever changes.
                 _wobblePhase = 0f;
                 _wobbleElapsed = 0f;
@@ -204,16 +217,16 @@ namespace WeeSpurts.Bowling
 
             float speed = Mathf.Lerp(config.MinLaunchSpeed, config.MaxLaunchSpeed, Mathf.Clamp01(p.Power01));
             Quaternion aim = Quaternion.Euler(0f, p.AngleDegrees + angleJitter, 0f);
-            Vector3 dir = aim * Vector3.forward;
+            Vector3 dir = aim * LaneForward;
 
             BallVelocity = dir * speed;
             // Rolling spin around the travel axis makes the curve feel physical.
-            _rb.angularVelocity = new Vector3(speed / Mathf.Max(0.01f, _config.Radius), 0f, 0f);
+            _rb.angularVelocity = LaneRight * (speed / Mathf.Max(0.01f, _config.Radius));
 
             // The spin ramp is measured from where this throw actually started,
             // not from the world origin, so a throw released from the far left of
             // the lane ramps identically to one from the middle.
-            _launchZ = transform.position.z;
+            _launchDist = DistanceDownLane(transform.position);
             _launchDir = dir;
 
             // Player spin + the release fumble, clamped back into the unit circle
@@ -232,15 +245,16 @@ namespace WeeSpurts.Bowling
             // rolled out. This is what makes topspin bite EARLY and backspin break
             // LATE — the same dialled spin produces a different force depending on
             // where the ball is down the lane. See SpinModel.RampShape.
-            float rampProgress = SpinModel.Progress01(transform.position.z - _launchZ,
+            float velocityDownLane = Vector3.Dot(BallVelocity, LaneForward);
+            float rampProgress = SpinModel.Progress01(DistanceDownLane(transform.position) - _launchDist,
                                                       _config.SpinRampDistance);
 
             // Player spin: a sideways force shaped by the ramp above.
-            if (Mathf.Abs(_spin.x) > 0.01f && BallVelocity.z > 0.5f)
+            if (Mathf.Abs(_spin.x) > 0.01f && velocityDownLane > 0.5f)
             {
                 float playerSpinForce = SpinModel.LateralForce(
                     _spin, rampProgress, _config.SpinCurveForce, _config.RollSkidHookScale);
-                _rb.AddForce(Vector3.right * playerSpinForce, ForceMode.Force);
+                _rb.AddForce(LaneRight * playerSpinForce, ForceMode.Force);
             }
 
             // Topspin drives forward ("grips and rolls out"). Along the STORED
@@ -248,7 +262,7 @@ namespace WeeSpurts.Bowling
             // its original line instead of amplifying whatever the hook has already
             // done to it — that feedback loop would make topspin curve MORE, which
             // is the opposite of the point.
-            if (_spin.y > 0.01f && BallVelocity.z > 0.5f)
+            if (_spin.y > 0.01f && velocityDownLane > 0.5f)
                 _rb.AddForce(_launchDir * SpinModel.DriveForce(_spin, _config.SpinDriveForce),
                              ForceMode.Force);
 
@@ -266,8 +280,8 @@ namespace WeeSpurts.Bowling
             // Deliberately NOT ramped like player spin: the fumble reads as a
             // constant wrongness from the instant of release, which keeps it
             // visually distinguishable from a dialled late break.
-            if (_hookForce != 0f && BallVelocity.z > 0.5f)
-                _rb.AddForce(Vector3.right * _hookForce, ForceMode.Force);
+            if (_hookForce != 0f && velocityDownLane > 0.5f)
+                _rb.AddForce(LaneRight * _hookForce, ForceMode.Force);
 
             // Wobbler: continuous sinusoidal weave for the WHOLE throw, unlike Hook
             // (which is 0 at perfect timing). Elapsed time accumulates every tick
@@ -275,10 +289,10 @@ namespace WeeSpurts.Bowling
             // so the phase tracks fixed-timestep ticks exactly, which is the more
             // rigorously deterministic pattern for a future networked replay.
             _wobbleElapsed += Time.fixedDeltaTime;
-            if (_config.WobbleForceMagnitude != 0f && BallVelocity.z > 0.5f)
+            if (_config.WobbleForceMagnitude != 0f && velocityDownLane > 0.5f)
             {
                 float wobble = Mathf.Sin(_wobbleElapsed * _config.WobbleFrequencyHz * Mathf.PI * 2f + _wobblePhase) * _config.WobbleForceMagnitude;
-                _rb.AddForce(Vector3.right * wobble, ForceMode.Force);
+                _rb.AddForce(LaneRight * wobble, ForceMode.Force);
             }
 
             // Settled = slow for long enough, or timed out entirely.

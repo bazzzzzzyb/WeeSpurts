@@ -49,6 +49,10 @@ namespace WeeSpurts.Bowling
         // resetting it mid-slide is what makes damping snap.
         private float _slideVelocity;
 
+        // Null game.Lane -> world +X, byte-identical to this class's
+        // behaviour before LaneFrame existed. See LaneFrame's class comment.
+        private Vector3 LaneRight => game != null && game.Lane != null ? game.Lane.Right : Vector3.right;
+
         public void Configure(BallLauncher launcherRef, BowlingMatchFlow gameRef)
         {
             launcher = launcherRef;
@@ -102,16 +106,26 @@ namespace WeeSpurts.Bowling
                 return;
             }
 
-            float targetX = homePosition.x + launcher.CurrentLateral * game.HalfLaneWidth;
+            // Lateral offset measured/rebuilt along the lane's own Right axis
+            // instead of the raw world X component, so this still means
+            // "sideways relative to the lane" on a lane that doesn't run
+            // along world Z. SmoothDamp is translation-invariant (its result
+            // only depends on the target-minus-current delta), so smoothing
+            // this relative offset and adding it back to homePosition gives
+            // the exact same numbers as the old p.x-based version whenever
+            // LaneRight is the default (1,0,0).
+            Vector3 laneRight = LaneRight;
+            float currentLateral = Vector3.Dot(transform.position - homePosition, laneRight);
+            float targetLateral = launcher.CurrentLateral * game.HalfLaneWidth;
+            float smoothedLateral = Mathf.SmoothDamp(currentLateral, targetLateral, ref _slideVelocity, smoothTime, maxSpeed);
 
-            Vector3 p = transform.position;
-            p.x = Mathf.SmoothDamp(p.x, targetX, ref _slideVelocity, smoothTime, maxSpeed);
-            // Y and Z are pinned to home rather than left as-is, so nothing else
-            // nudging the root (a stray reaction clip, a future ragdoll) can
-            // quietly walk the thrower off the foul line over a match.
-            p.y = homePosition.y;
-            p.z = homePosition.z;
-            transform.position = p;
+            // Y and Z (in the default axes) are pinned to home rather than left
+            // as-is, so nothing else nudging the root (a stray reaction clip, a
+            // future ragdoll) can quietly walk the thrower off the foul line
+            // over a match — laneRight has no vertical component (lanes are
+            // level) and moving only along it from a home baseline achieves
+            // the same "everything except lateral is pinned" guarantee.
+            transform.position = homePosition + laneRight * smoothedLateral;
         }
     }
 }

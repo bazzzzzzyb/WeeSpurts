@@ -98,6 +98,30 @@ namespace WeeSpurts.Bowling
         // all rather than throwing a NullReferenceException every single frame.
         private bool _wired;
 
+        // Null game.Lane -> world Z/X, byte-identical to this class's
+        // behaviour before LaneFrame existed. See LaneFrame's class comment.
+        private LaneFrame Lane => game != null ? game.Lane : null;
+        private Vector3 LaneForward => Lane != null ? Lane.Forward : Vector3.forward;
+        private Vector3 LaneRight => Lane != null ? Lane.Right : Vector3.right;
+
+        /// <summary>How far a world point is down-lane from the lane origin. Null Lane -> raw world Z.</summary>
+        private float DownLane(Vector3 worldPosition) => Lane != null ? Lane.DistanceAlong(worldPosition) : worldPosition.z;
+
+        /// <summary>How far a world point is lateral from the lane origin. Null Lane -> raw world X.</summary>
+        private float Lateral(Vector3 worldPosition) => Lane != null ? Lane.LateralOf(worldPosition) : worldPosition.x;
+
+        /// <summary>Builds a world position from (down-lane, lateral, height). Null Lane -> new Vector3(lateral, height, downLane), matching the old hand-built Vector3s exactly.</summary>
+        private Vector3 LanePoint(float downLane, float lateral, float height) =>
+            Lane != null ? Lane.PointAt(downLane, lateral, height) : new Vector3(lateral, height, downLane);
+
+        /// <summary>
+        /// Reinterprets a Vector3 authored as a "world offset" (x=lateral,
+        /// y=height, z=down-lane) as a lane-relative one instead. Null Lane ->
+        /// exactly the original vector, since LaneRight/LaneForward reduce to
+        /// world +X/+Z.
+        /// </summary>
+        private Vector3 LaneOffset(Vector3 offset) => LaneRight * offset.x + Vector3.up * offset.y + LaneForward * offset.z;
+
         // --- beat state ---
         /// <summary>
         /// How a beat travels from its starting pose to its target pose. This is
@@ -146,19 +170,20 @@ namespace WeeSpurts.Bowling
 
         // --- post-release watchdogs (see the config's "Safety nets" header) ---
         private bool _rollInFlight;
-        private float _maxBallZ;
+        private float _maxBallDownLane;
         private float _lastProgressTime;
         private float _throwStartTime;
 
         // --- beat F progress ---
-        private float _impactStartZ;
+        private float _impactStartDownLane;
         private float _impactU;          // 0 = just triggered, 1 = ball at the pins
         private bool _impactForceComplete;
 
         // Lane anchors, refreshed each frame from the ball spawn so moving the
-        // spawn point in the editor reshapes the move without a rebuild.
-        private float _laneOriginZ;
-        private float _laneCentreX;
+        // spawn point in the editor reshapes the move without a rebuild. Lane-
+        // relative (down-lane/lateral), not raw world Z/X — see DownLane/Lateral.
+        private float _laneOriginDownLane;
+        private float _laneCentreLateral;
 
         private void Awake()
         {
@@ -221,8 +246,8 @@ namespace WeeSpurts.Bowling
 
             if (game.BallSpawn != null)
             {
-                _laneOriginZ = game.BallSpawn.position.z;
-                _laneCentreX = game.BallSpawn.position.x;
+                _laneOriginDownLane = DownLane(game.BallSpawn.position);
+                _laneCentreLateral = Lateral(game.BallSpawn.position);
             }
 
             // 1. A new roll starting always wins: BeginAim() is the one signal
@@ -333,7 +358,7 @@ namespace WeeSpurts.Bowling
             _impactForceComplete = false;
             _throwStartTime = Time.time;
             _lastProgressTime = Time.time;
-            _maxBallZ = ball.transform.position.z;
+            _maxBallDownLane = DownLane(ball.transform.position);
 
             // SidePass, NOT Cylindrical. Beat D ends OUT OVER THE LANE, which is
             // on the opposite side of the thrower from where beat C was standing,
@@ -363,10 +388,10 @@ namespace WeeSpurts.Bowling
         {
             if (!_rollInFlight) return;
 
-            float z = ball.transform.position.z;
-            if (z > _maxBallZ + config.StallProgressEpsilon)
+            float z = DownLane(ball.transform.position);
+            if (z > _maxBallDownLane + config.StallProgressEpsilon)
             {
-                _maxBallZ = z;
+                _maxBallDownLane = z;
                 _lastProgressTime = Time.time;
             }
 
@@ -452,12 +477,12 @@ namespace WeeSpurts.Bowling
             // fumble) must not fly to the pin deck. Not normally reachable —
             // the distance check below already implies real progress — but it
             // makes the intent explicit and survives someone retuning the lead.
-            if (_maxBallZ < _laneOriginZ + config.MinProgressZ) return false;
+            if (_maxBallDownLane < _laneOriginDownLane + config.MinProgressZ) return false;
 
-            float ballZ = ball.transform.position.z;
-            if (ballZ < pinDeck.position.z - config.FImpactLeadDistance) return false;
+            float ballZ = DownLane(ball.transform.position);
+            if (ballZ < DownLane(pinDeck.position) - config.FImpactLeadDistance) return false;
 
-            _impactStartZ = ballZ;
+            _impactStartDownLane = ballZ;
             _impactU = 0f;
             _impactForceComplete = false;
             // Duration is unused for this beat — its progress comes from the
@@ -474,7 +499,7 @@ namespace WeeSpurts.Bowling
         /// </summary>
         private void UpdateImpactProgress()
         {
-            float pinZ = pinDeck != null ? pinDeck.position.z : _impactStartZ;
+            float pinZ = pinDeck != null ? DownLane(pinDeck.position) : _impactStartDownLane;
 
             if (_impactForceComplete)
             {
@@ -482,11 +507,11 @@ namespace WeeSpurts.Bowling
                 // so the shot still lands instead of freezing part-way.
                 _impactU = Mathf.Clamp01(_impactU + Time.deltaTime / Mathf.Max(0.0001f, config.FCompleteDuration));
             }
-            else if (pinZ > _impactStartZ)
+            else if (pinZ > _impactStartDownLane)
             {
                 // Mathf.Max keeps u monotonic: a ball that bounces back off a pin
                 // must not drag the camera backwards through the move.
-                _impactU = Mathf.Max(_impactU, Mathf.InverseLerp(_impactStartZ, pinZ, ball.transform.position.z));
+                _impactU = Mathf.Max(_impactU, Mathf.InverseLerp(_impactStartDownLane, pinZ, DownLane(ball.transform.position)));
             }
             else
             {
@@ -525,9 +550,12 @@ namespace WeeSpurts.Bowling
                     // see ThrowCameraFraming.CylindricalLerp for why this matters.
                     // Also the right path for a straight dolly in/out (B), which is
                     // just a change of radius with the angle held constant.
+                    // LaneForward/LaneRight passed explicitly so "angle 0" means
+                    // down-lane on this lane specifically, not always world +Z.
                     position = ThrowCameraFraming.CylindricalLerp(_fromPosition, targetPosition,
                                                                   thrower.position, eased,
-                                                                  config.MinThrowerClearance);
+                                                                  config.MinThrowerClearance,
+                                                                  LaneForward, LaneRight);
                     break;
 
                 case BlendMode.SidePass:
@@ -535,7 +563,7 @@ namespace WeeSpurts.Bowling
                     // the thrower. The bulge is zero at both ends, so this still
                     // starts and finishes at exactly the poses the beats asked for.
                     position = ThrowCameraFraming.SidePassLerp(_fromPosition, targetPosition,
-                                                               eased, config.DPassSideOffset);
+                                                               eased, config.DPassSideOffset, LaneRight);
                     break;
 
                 default:
@@ -609,11 +637,17 @@ namespace WeeSpurts.Bowling
             // stays correct if the deck moves; fall back to the configured lane
             // length otherwise.
             float pinZ = pinDeck != null
-                ? pinDeck.position.z
-                : _laneOriginZ + (laneConfig != null ? laneConfig.Length : 0f);
+                ? DownLane(pinDeck.position)
+                : _laneOriginDownLane + (laneConfig != null ? laneConfig.Length : 0f);
 
-            float capZ = Mathf.Lerp(_laneOriginZ, pinZ, config.TravelCapLane01);
-            return new Vector3(position.x, position.y, Mathf.Min(position.z, capZ));
+            float capZ = Mathf.Lerp(_laneOriginDownLane, pinZ, config.TravelCapLane01);
+            float currentDownLane = DownLane(position);
+            float clampedDownLane = Mathf.Min(currentDownLane, capZ);
+            // Nudge only along the down-lane axis by the clamp amount, leaving
+            // lateral/height untouched — the same effect as the old
+            // "new Vector3(position.x, position.y, Mathf.Min(...))" had when
+            // down-lane was always world Z.
+            return position + LaneForward * (clampedDownLane - currentDownLane);
         }
 
         /// <summary>
@@ -630,11 +664,14 @@ namespace WeeSpurts.Bowling
             switch (beat)
             {
                 case Beat.YoureUp:
-                    // World-axis offsets, not thrower-local: the thrower proxy
-                    // does not meaningfully rotate, and world offsets are far
-                    // easier for a human to reason about in the Inspector.
-                    position = throwerPos + config.APositionOffset;
-                    lookPoint = throwerPos + config.ALookOffset;
+                    // Lane-relative offsets (x=lateral, y=height, z=down-lane),
+                    // not thrower-local: the thrower proxy does not meaningfully
+                    // rotate, and these numbers are far easier for a human to
+                    // reason about in the Inspector than a raw world offset.
+                    // LaneOffset reduces to the literal offset unchanged when
+                    // this lane runs along world Z (every scene but this one).
+                    position = throwerPos + LaneOffset(config.APositionOffset);
+                    lookPoint = throwerPos + LaneOffset(config.ALookOffset);
                     return;
 
                 case Beat.TakeStance:
@@ -645,7 +682,14 @@ namespace WeeSpurts.Bowling
                     // those numbers: the aim view is what AimPreview's guide line
                     // was authored against, so drifting from it would break the
                     // Wii-Sports aim read.
-                    position = _throwCamera.AimViewPosition + config.A2PositionOffset;
+                    position = _throwCamera.AimViewPosition + LaneOffset(config.A2PositionOffset);
+                    // Camera ORIENTATION, not lane position: AimViewEuler is
+                    // already an absolute rotation authored for this venue (set
+                    // once via ThrowCamera.ConfigureAimView), and composing a
+                    // small nudge on top of it with plain Euler addition, then
+                    // reading off world Vector3.forward, correctly gives "which
+                    // way that absolute angle faces" regardless of the lane's
+                    // own orientation — no LaneForward substitution needed here.
                     Quaternion aimRotation = Quaternion.Euler(_throwCamera.AimViewEuler + config.A2EulerOffset);
                     lookPoint = position + aimRotation * Vector3.forward * LOOK_POINT_DISTANCE;
                     return;
@@ -660,39 +704,46 @@ namespace WeeSpurts.Bowling
                     // sideways rotation. The cylindrical blend is still the right
                     // path here: it interpolates the RADIUS, which is exactly
                     // what "zoom in on the character" means.
+                    // Passing LaneForward as the "angle 0" reference so
+                    // BZoomAngleDegrees (authored assuming 0 = down-lane) still
+                    // means down-lane on a lane that doesn't run along world Z.
                     position = ThrowCameraFraming.PointAround(throwerPos, config.BZoomAngleDegrees,
-                                                              config.BZoomRadius, config.BZoomHeight);
-                    lookPoint = throwerPos + new Vector3(0f, config.BZoomLookHeight, config.BZoomLookAheadDistance);
+                                                              config.BZoomRadius, config.BZoomHeight, LaneForward);
+                    lookPoint = throwerPos + LaneOffset(new Vector3(0f, config.BZoomLookHeight, config.BZoomLookAheadDistance));
                     return;
 
                 case Beat.Release:
-                    position = new Vector3(_laneCentreX + config.DLateralOffset,
-                                           config.DHeight,
-                                           _laneOriginZ + config.DDistanceDownLane);
-                    // This beat's pose is authored in world space rather than as
-                    // a swing, so the thrower-clearance floor has to be applied
+                    position = LanePoint(_laneOriginDownLane + config.DDistanceDownLane,
+                                        _laneCentreLateral + config.DLateralOffset,
+                                        config.DHeight);
+                    // This beat's pose is authored directly rather than as a
+                    // swing, so the thrower-clearance floor has to be applied
                     // by hand here (the cylindrical beats get it for free).
+                    // EnforceRadialClearance itself needs no lane awareness —
+                    // it only measures/pushes along horizontal RADIUS from the
+                    // thrower, which is rotation-invariant.
                     position = ThrowCameraFraming.EnforceRadialClearance(position, throwerPos,
                                                                          config.MinThrowerClearance);
-                    lookPoint = new Vector3(_laneCentreX, config.DLookHeight,
-                                            position.z + config.DLookAheadDistance);
+                    lookPoint = LanePoint(DownLane(position) + config.DLookAheadDistance,
+                                         _laneCentreLateral, config.DLookHeight);
                     return;
 
                 case Beat.Travel:
                 {
                     Vector3 ballPos = ball.transform.position;
+                    float ballLateral = Lateral(ballPos);
+                    float ballDownLane = DownLane(ballPos);
                     // Lateral tracking: 0 keeps the camera on the lane centreline
                     // so a hook visibly drifts across frame; 1 glues the ball to
                     // the centre of frame and swings the lane around instead.
-                    float x = Mathf.Lerp(_laneCentreX, ballPos.x, config.ELateralFollow01)
-                              + config.ETravelOffset.x;
-                    position = ClampToTravelCap(new Vector3(x,
-                                                            ballPos.y + config.ETravelOffset.y,
-                                                            ballPos.z + config.ETravelOffset.z));
+                    float lateral = Mathf.Lerp(_laneCentreLateral, ballLateral, config.ELateralFollow01)
+                                    + config.ETravelOffset.x;
+                    position = ClampToTravelCap(LanePoint(ballDownLane + config.ETravelOffset.z,
+                                                          lateral, ballPos.y + config.ETravelOffset.y));
                     // The LOOK point is deliberately NOT capped. That is the whole
                     // effect: once the camera stops, it keeps watching down-lane
                     // while the ball runs away from it into the pins.
-                    lookPoint = ballPos + Vector3.forward * config.ELookAheadDistance;
+                    lookPoint = ballPos + LaneForward * config.ELookAheadDistance;
                     return;
                 }
 
@@ -701,7 +752,7 @@ namespace WeeSpurts.Bowling
                 {
                     Vector3 deckCentre = pinDeck != null
                         ? pinDeck.position
-                        : new Vector3(_laneCentreX, 0f, _laneOriginZ);
+                        : LanePoint(_laneOriginDownLane, _laneCentreLateral, 0f);
                     float laneWidth = laneConfig != null ? laneConfig.Width : 1f;
 
                     // NOT an authored distance: solved so exactly FLanesInFrame
@@ -716,8 +767,9 @@ namespace WeeSpurts.Bowling
                     // stricter of the two — see ClampToTravelCap. With the cap on,
                     // FLanesInFrame stops governing the shot and the impact is
                     // framed from wherever the camera was allowed to stop.
-                    position = ClampToTravelCap(deckCentre + new Vector3(0f, config.FImpactHeight, -distance));
-                    lookPoint = deckCentre + new Vector3(0f, config.FLookHeight, 0f);
+                    position = ClampToTravelCap(deckCentre + LaneOffset(new Vector3(0f, config.FImpactHeight, -distance)));
+                    // Purely vertical — no lane axis involved either way.
+                    lookPoint = deckCentre + Vector3.up * config.FLookHeight;
                     return;
                 }
 

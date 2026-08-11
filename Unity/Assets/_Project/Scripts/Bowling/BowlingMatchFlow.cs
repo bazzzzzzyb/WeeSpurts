@@ -48,6 +48,9 @@ namespace WeeSpurts.Bowling
         [SerializeField] private BallLauncher launcher;
         [SerializeField] private Transform ballSpawn;
 
+        [Tooltip("Optional. This lane's own down-lane/lateral axes. Leave empty for the default world Z/X axes — every lane GreyboxSceneBuilder generates.")]
+        [SerializeField] private LaneFrame lane;
+
         // The local presentation half. Same sibling-component pattern
         // BallConfigSwitcher/BallLauncher already use to reach this class:
         // both live on the "BowlingGame" GameObject, so neither needs wiring.
@@ -111,11 +114,24 @@ namespace WeeSpurts.Bowling
             pinDeck = deck; launcher = l; ballSpawn = spawn;
         }
 
+        /// <summary>
+        /// Separate from Configure() so every existing GreyboxSceneBuilder call
+        /// site stays untouched — this is additive, wired only where a lane
+        /// actually needs its own axes (ThunderLanesVenue today).
+        /// </summary>
+        public void SetLane(LaneFrame laneFrame) => lane = laneFrame;
+
         /// <summary>The ball config the NEXT throw will use. Read by the debug HUD.</summary>
         public BallConfig ActiveBallConfig => ballConfig;
 
         /// <summary>Where a fresh roll starts. Exposed for the sandbox aim preview.</summary>
         public Transform BallSpawn => ballSpawn;
+
+        /// <summary>This lane's own axes, if wired — see LaneFrame's class comment. May be null.</summary>
+        public LaneFrame Lane => lane;
+
+        /// <summary>Lateral direction for this lane. Null Lane -> world +X, unchanged from before LaneFrame existed.</summary>
+        public Vector3 LaneRight => lane != null ? lane.Right : Vector3.right;
 
         /// <summary>
         /// Half the lane width available to the ball's CENTER, accounting for
@@ -424,7 +440,7 @@ namespace WeeSpurts.Bowling
             }
 
             // Place the ball at the chosen lateral spot, then hand physics the wheel.
-            Vector3 start = ballSpawn.position + Vector3.right * (p.LateralPosition01 * HalfLaneWidth);
+            Vector3 start = ballSpawn.position + LaneRight * (p.LateralPosition01 * HalfLaneWidth);
             ball.ResetForThrow(start);
 
             _ballSettled = false;
@@ -535,7 +551,7 @@ namespace WeeSpurts.Bowling
         private IEnumerator ResolveNukeThrow(LaunchParameters p)
         {
             bool isGreen = p.IsGreen;
-            Vector3 spawnPos = ballSpawn.position + Vector3.right * (p.LateralPosition01 * HalfLaneWidth);
+            Vector3 spawnPos = ballSpawn.position + LaneRight * (p.LateralPosition01 * HalfLaneWidth);
             int knocked;
 
             if (isGreen)

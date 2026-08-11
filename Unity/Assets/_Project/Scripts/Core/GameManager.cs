@@ -26,18 +26,18 @@ namespace WeeSpurts.Core
         public event System.Action<AppState> OnStateChanged;
 
         [Header("Economy")]
-        [Tooltip("Optional. Leave empty and the session runs on EconomyConfig.DEFAULT_STARTING_COINS, so an unwired scene still plays.")]
+        [Tooltip("Optional. Leave empty and the session runs on EconomyConfig.DEFAULT_STARTING_TICKETS, so an unwired scene still plays.")]
         [SerializeField] private EconomyConfig economyConfig;
 
         /// <summary>
-        /// THE fake-coin ledger for this whole session — Tony's call, 2026-08-04.
+        /// THE fake-ticket ledger for this whole session — Tony's call, 2026-08-04.
         ///
         /// SESSION-SCOPED, NOT MATCH-SCOPED, and living here specifically
         /// because this object already survives scene changes. Two consequences
         /// worth knowing before anyone "fixes" one of them:
         ///
         ///   1. Winnings CARRY BETWEEN MATCHES, like a real alley. Nobody's
-        ///      coins reset because a game ended.
+        ///      tickets reset because a game ended.
         ///   2. The bar and the card table keep working when NO match is
         ///      running — which is exactly when people wander off to use them.
         ///      A match-scoped ledger would make the casino corner dead in the
@@ -50,11 +50,11 @@ namespace WeeSpurts.Core
         /// swapping it for a host-authoritative wrapper touches this class and
         /// nothing else.
         /// </summary>
-        public CoinLedger Coins { get; private set; }
+        public TicketLedger Tickets { get; private set; }
 
         /// <summary>Starting balance for a newly-seen player. Falls back if no config asset is wired.</summary>
-        public int StartingCoins =>
-            economyConfig != null ? economyConfig.StartingCoins : EconomyConfig.DEFAULT_STARTING_COINS;
+        public int StartingTickets =>
+            economyConfig != null ? economyConfig.StartingTickets : EconomyConfig.DEFAULT_STARTING_TICKETS;
 
         private void Awake()
         {
@@ -71,8 +71,8 @@ namespace WeeSpurts.Core
             // Built here rather than inline so the DUPLICATE GameManager above
             // returns before ever making one — otherwise a second manager would
             // create a second ledger, briefly, and any listener that grabbed it
-            // in the same frame would be writing coins into an orphan.
-            Coins = new CoinLedger();
+            // in the same frame would be writing tickets into an orphan.
+            Tickets = new TicketLedger();
         }
 
         /// <summary>
@@ -80,11 +80,11 @@ namespace WeeSpurts.Core
         /// starting balance. Idempotent — safe to call on every join, every
         /// reconnect, and every scene load, which is the point: callers should
         /// never have to remember whether they've done this before, because
-        /// getting that wrong either wipes someone's coins or leaves them
+        /// getting that wrong either wipes someone's tickets or leaves them
         /// unable to buy a drink.
         /// </summary>
         /// <returns>True if they were newly registered.</returns>
-        public bool EnsurePlayer(ulong playerId) => Coins.Register(playerId, StartingCoins);
+        public bool EnsurePlayer(ulong playerId) => Tickets.Register(playerId, StartingTickets);
 
         public void SetState(AppState next)
         {

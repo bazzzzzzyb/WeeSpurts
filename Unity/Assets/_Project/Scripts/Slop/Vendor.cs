@@ -10,13 +10,13 @@ namespace WeeSpurts.Slop
         Purchased,
         UnknownItem,
         OutOfStock,
-        NotEnoughCoins,
+        NotEnoughTickets,
         InvalidRequest
     }
 
     /// <summary>
     /// The answer to one purchase attempt. Carries the underlying
-    /// <see cref="CoinTransaction"/> so a caller that wants the new balance
+    /// <see cref="TicketTransaction"/> so a caller that wants the new balance
     /// doesn't have to go and ask the ledger again.
     /// </summary>
     public readonly struct PurchaseResult
@@ -25,14 +25,14 @@ namespace WeeSpurts.Slop
         public readonly ulong PlayerId;
         public readonly int ItemId;
         public readonly int Price;
-        public readonly CoinTransaction Transaction;
+        public readonly TicketTransaction Transaction;
         /// <summary>Negative means unlimited. Unchanged on a failure.</summary>
         public readonly int StockRemaining;
 
         public bool Success => Outcome == PurchaseOutcome.Purchased;
 
         public PurchaseResult(PurchaseOutcome outcome, ulong playerId, int itemId, int price,
-                              CoinTransaction transaction, int stockRemaining)
+                              TicketTransaction transaction, int stockRemaining)
         {
             Outcome = outcome;
             PlayerId = playerId;
@@ -44,7 +44,7 @@ namespace WeeSpurts.Slop
     }
 
     /// <summary>
-    /// A place that takes coins and gives you a thing: the bar, the cosmetics
+    /// A place that takes tickets and gives you a thing: the bar, the cosmetics
     /// counter, later the card table's buy-in. `Docs/SlopLayerPlan.md` S4.
     ///
     /// DELIBERATELY PURE C# — no MonoBehaviour, no UnityEngine. The scene side
@@ -53,8 +53,8 @@ namespace WeeSpurts.Slop
     /// what lets the money rules be unit-tested without Play mode, which is
     /// the only reason you can trust them without playing the game.
     ///
-    /// IT DOES NOT TOUCH BALANCES ITSELF. Every coin movement goes through
-    /// <see cref="CoinLedger"/> — Rule 1, one choke point. This class decides
+    /// IT DOES NOT TOUCH BALANCES ITSELF. Every ticket movement goes through
+    /// <see cref="TicketLedger"/> — Rule 1, one choke point. This class decides
     /// what things cost and whether any are left; the ledger decides whether
     /// the player can pay. When the networked wrapper lands, this class does
     /// not change at all.
@@ -142,7 +142,7 @@ namespace WeeSpurts.Slop
         /// the balance can move between the check and the purchase (a bet
         /// resolves, a payout lands). Always act on <see cref="Purchase"/>'s result.
         /// </summary>
-        public bool CanBuy(CoinLedger ledger, ulong playerId, int itemId)
+        public bool CanBuy(TicketLedger ledger, ulong playerId, int itemId)
         {
             if (ledger == null) return false;
             if (!TryGetItem(itemId, out VendorItem item)) return false;
@@ -155,15 +155,15 @@ namespace WeeSpurts.Slop
         ///
         ///   1. Does the item exist?
         ///   2. Is there stock left?
-        ///   3. Ask the ledger to take the coins.
+        ///   3. Ask the ledger to take the tickets.
         ///   4. ONLY IF the ledger granted, consume a unit of stock.
         ///
         /// Step 4 after step 3 is not a style preference. Consume stock first
         /// and a player who can't afford the last golden hat destroys it for
         /// everyone — a refused purchase must leave the world exactly as it
-        /// found it. Same reasoning as CoinLedger.Transfer being atomic.
+        /// found it. Same reasoning as TicketLedger.Transfer being atomic.
         /// </summary>
-        public PurchaseResult Purchase(CoinLedger ledger, ulong playerId, int itemId)
+        public PurchaseResult Purchase(TicketLedger ledger, ulong playerId, int itemId)
         {
             if (ledger == null)
                 return Fail(PurchaseOutcome.InvalidRequest, playerId, itemId, 0);
@@ -180,15 +180,15 @@ namespace WeeSpurts.Slop
             if (item.Price <= 0)
                 return Fail(PurchaseOutcome.InvalidRequest, playerId, itemId, item.Price);
 
-            CoinTransaction tx = ledger.RequestSpend(playerId, item.Price, $"{Name}:{item.DisplayName}");
+            TicketTransaction tx = ledger.RequestSpend(playerId, item.Price, $"{Name}:{item.DisplayName}");
             if (!tx.Granted)
             {
                 // Everything that isn't "you're broke" — unknown player, bad
                 // amount — is a wiring mistake rather than a player-facing
                 // state, so it is reported as invalid rather than pretending
-                // they were short of coins.
-                PurchaseOutcome why = tx.Result == CoinResult.InsufficientFunds
-                    ? PurchaseOutcome.NotEnoughCoins
+                // they were short of tickets.
+                PurchaseOutcome why = tx.Result == TicketResult.InsufficientFunds
+                    ? PurchaseOutcome.NotEnoughTickets
                     : PurchaseOutcome.InvalidRequest;
 
                 var refused = new PurchaseResult(why, playerId, itemId, item.Price, tx, StockRemaining(itemId));

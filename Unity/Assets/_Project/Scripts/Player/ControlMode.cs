@@ -17,6 +17,14 @@ namespace WeeSpurts.Player
         Roaming,
 
         /// <summary>At the foul line. The bowling camera and ThrowerAimSlide own you.</summary>
-        Bowling
+        Bowling,
+
+        /// <summary>
+        /// Sitting — a blackjack/vendor table, a bar stool, a lane bench. You
+        /// still own your own (first-person) camera and can look around; you
+        /// cannot walk, and PlayerInteractor is off so you can't re-trigger
+        /// whatever seated you. See PlayerAvatar.EnterSeated.
+        /// </summary>
+        Seated
     }
 }

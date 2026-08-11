@@ -21,7 +21,7 @@ namespace WeeSpurts.Interaction
     /// implementor has to change shape. Passing the avatar costs nothing now
     /// and means the answers can already differ per player: a bar that refuses
     /// you because YOUR drink meter is full, a kiosk that only the host may
-    /// use, a slot machine that knows whose coins are whose.
+    /// use, a slot machine that knows whose tickets are whose.
     ///
     /// WHERE MIRROR GOES (Docs/Networking.md — host-authoritative, "no client
     /// trusts another client"): <see cref="Interact"/> is the exact seam. It
@@ -71,7 +71,7 @@ namespace WeeSpurts.Interaction
         /// implementor has copied the mistake.
         ///
         /// Still per-player, because the ACTION text can legitimately differ:
-        /// "Buy a Drink (5 coins)" vs "You've had enough".
+        /// "Buy a Drink (5 tickets)" vs "You've had enough".
         /// </summary>
         string GetPrompt(PlayerAvatar player);
 

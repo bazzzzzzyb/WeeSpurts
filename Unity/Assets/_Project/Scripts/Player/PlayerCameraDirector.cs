@@ -94,7 +94,12 @@ namespace WeeSpurts.Player
             // IS running this is byte-for-byte isLocalPlayer.
             if (avatar != null && !avatar.IsThisMachinesPlayer) return;
 
-            bool roaming = mode == ControlMode.Roaming;
+            // Roaming AND Seated both keep the player's own first-person
+            // camera — only Bowling hands it to the scene's bowling camera.
+            // Deliberately NOT "mode == ControlMode.Roaming": that was fine
+            // when Bowling was the only other mode, but with Seated added it
+            // would silently switch a seated player onto the bowling camera.
+            bool useFirstPersonCamera = mode != ControlMode.Bowling;
 
             // Order does not matter for rendering, but enabling the incoming
             // listener before disabling the outgoing one would briefly leave two
@@ -102,10 +107,10 @@ namespace WeeSpurts.Player
             if (firstPersonListener != null) firstPersonListener.enabled = false;
             if (bowlingListener != null) bowlingListener.enabled = false;
 
-            if (firstPersonCamera != null) firstPersonCamera.enabled = roaming;
-            if (bowlingCamera != null) bowlingCamera.enabled = !roaming;
+            if (firstPersonCamera != null) firstPersonCamera.enabled = useFirstPersonCamera;
+            if (bowlingCamera != null) bowlingCamera.enabled = !useFirstPersonCamera;
 
-            if (roaming)
+            if (useFirstPersonCamera)
             {
                 if (firstPersonListener != null) firstPersonListener.enabled = true;
             }

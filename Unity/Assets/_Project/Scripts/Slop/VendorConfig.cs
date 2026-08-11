@@ -20,7 +20,7 @@ namespace WeeSpurts.Slop
     [CreateAssetMenu(fileName = "VendorConfig", menuName = "WeeSpurts/Vendor Config")]
     public class VendorConfig : ScriptableObject
     {
-        [Tooltip("Shown in the interaction prompt and used as the tag on every coin transaction from this shop, so it turns up in the coin feed and the logs. Keep it short: 'Bar', 'Cosmetics'.")]
+        [Tooltip("Shown in the interaction prompt and used as the tag on every ticket transaction from this shop, so it turns up in the ticket feed and the logs. Keep it short: 'Bar', 'Cosmetics'.")]
         public string VendorName = "Bar";
 
         [Tooltip("Everything on sale here. ItemIds must be unique within this vendor — duplicates are ignored at load rather than crashing, but they mean one of your items is unreachable.")]

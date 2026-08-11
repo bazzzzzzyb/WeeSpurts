@@ -93,6 +93,23 @@ namespace WeeSpurts.Player
         public bool IsThisMachinesPlayer => NetSession.IsOffline || isLocalPlayer;
 
         /// <summary>
+        /// This player's identity for <see cref="WeeSpurts.Gameplay.TicketLedger"/>
+        /// and every other economy system — a ulong, per SlopLayerPlan Rule 3
+        /// (ids, never references), matching PlayerData.Id's type so the two
+        /// player-identity systems line up if they ever merge.
+        ///
+        /// SOURCE: Mirror's own <c>netId</c> — same offline hazard as isServer/
+        /// isLocalPlayer above (see this class's NETWORKED note): NetworkBehaviour.
+        /// netId dereferences netIdentity directly with no null guard, so reading
+        /// it with no NetworkIdentity in the scene throws. NetSession.IsOffline
+        /// short-circuits that exactly like <see cref="IsThisMachinesPlayer"/> does.
+        /// OFFLINE FALLS BACK TO A FIXED 0 — there is exactly one walkable avatar
+        /// per machine today, so a constant id is correct, not a shortcut;
+        /// revisit if that ever stops being true.
+        /// </summary>
+        public ulong EconomyPlayerId => NetSession.IsOffline ? 0ul : netId;
+
+        /// <summary>
         /// Fired AFTER a mode change has been fully applied. This is how systems
         /// that are not mode-owned components (the camera director today, a HUD
         /// tomorrow) react without anyone reaching into this class's business.
@@ -145,6 +162,19 @@ namespace WeeSpurts.Player
             if (!NetSession.IsOffline && IsThisMachinesPlayer
                 && Mode == ControlMode.Roaming && Input.GetKeyDown(KeyCode.B))
                 CmdRequestStartBowling();
+
+            // Stage 1 DEBUG toggle only — not a seat/kiosk interactable yet,
+            // deliberately out of scope for this stage (same "debug trigger,
+            // not real UI" precedent as B above). Unlike CmdRequestStartBowling
+            // this never touches Mirror at all — no Command, no NetSession.
+            // IsOffline guard needed — so it behaves identically host, client,
+            // or fully offline. It also does NOT broadcast to other machines
+            // yet; see EnterSeated's doc comment for why that's fine for now.
+            if (IsThisMachinesPlayer && Input.GetKeyDown(KeyCode.N))
+            {
+                if (Mode == ControlMode.Roaming) EnterSeated(null);
+                else if (Mode == ControlMode.Seated) EnterRoaming();
+            }
         }
 
         /// <summary>
@@ -198,6 +228,32 @@ namespace WeeSpurts.Player
         }
 
         /// <summary>
+        /// Sit this player down: same shape as <see cref="EnterBowling"/> —
+        /// Mode first, ApplyMode second, optional teleport last — reusing
+        /// MoveToThrowingStance for that teleport even though "seat" isn't a
+        /// throw. That method is already a generic "snap to this Transform,
+        /// face down it" helper; nothing about it is bowling-specific, and
+        /// giving Seated its own copy would be the exact "second place
+        /// deciding" this class's doc comment warns against.
+        /// <paramref name="seat"/> may be null, in which case the avatar sits
+        /// wherever it's currently standing.
+        ///
+        /// STAGE 1 SCOPE: local only, same as FirstPersonController's
+        /// movement (see that class's own NOT NETWORKED note). Unlike
+        /// EnterBowling, nothing here broadcasts to other machines — a remote
+        /// client will not yet see this avatar sit down. Wiring that up is
+        /// the same Cmd/ClientRpc shape BowlingPresentation already uses for
+        /// EnterBowling, deliberately left for a later stage so this diff
+        /// stays exactly what was signed off on.
+        /// </summary>
+        public void EnterSeated(Transform seat)
+        {
+            Mode = ControlMode.Seated;
+            ApplyMode();
+            MoveToThrowingStance(seat);
+        }
+
+        /// <summary>
         /// THE ONLY PLACE mode-owned components and the cursor are switched.
         /// Read the class doc comment before adding anything here — and never
         /// add an equivalent line anywhere else.
@@ -205,6 +261,11 @@ namespace WeeSpurts.Player
         private void ApplyMode()
         {
             bool roaming = Mode == ControlMode.Roaming;
+            // Seated shares roaming's camera/cursor (you can still look
+            // around) but not roaming's locomotion or interactor — see the
+            // firstPersonController block below, which is the one place that
+            // splits the two instead of just using `roaming`.
+            bool hasCameraControl = roaming || Mode == ControlMode.Seated;
             _modeApplied = true;
 
             // --- Components that move this transform ------------------------
@@ -213,14 +274,19 @@ namespace WeeSpurts.Player
             // will arrive over the network later, but ThrowerAimSlide still
             // drives its slide from replicated aim values).
             //
-            // THE WHOLE REASON THE CHARACTERCONTROLLER GOES OFF FOR BOWLING:
-            // an ENABLED CharacterController owns its object's position and
-            // overwrites direct transform writes on the next physics step.
-            // ThrowerAimSlide works by writing transform.position every
-            // LateUpdate. Leave both on and they fight, every frame, and the
-            // character judders on the spot instead of sliding with the aim.
+            // THE WHOLE REASON THE CHARACTERCONTROLLER GOES OFF FOR BOWLING
+            // (AND SEATED): an ENABLED CharacterController owns its object's
+            // position and overwrites direct transform writes on the next
+            // physics step. ThrowerAimSlide works by writing transform.position
+            // every LateUpdate. Leave both on and they fight, every frame, and
+            // the character judders on the spot instead of sliding with the aim.
+            // Seated has no ThrowerAimSlide fight to avoid, but it has no
+            // locomotion either, so disabling it here is simply correct.
             if (characterController != null) characterController.enabled = roaming;
-            if (throwerAimSlide != null) throwerAimSlide.enabled = !roaming;
+            // Explicit Bowling check, not "!roaming": with three modes now,
+            // "not roaming" also matches Seated, and the aim slide must never
+            // touch a seated player's transform.
+            if (throwerAimSlide != null) throwerAimSlide.enabled = Mode == ControlMode.Bowling;
 
             // --- Local-input components -------------------------------------
             // Gated on IsThisMachinesPlayer (offline-aware isLocalPlayer): a
@@ -228,7 +294,15 @@ namespace WeeSpurts.Player
             // and mouse, and offline there is no remote anything to guard
             // against, so the check just needs to not crash on a null
             // netIdentity.
-            if (firstPersonController != null) firstPersonController.enabled = roaming && IsThisMachinesPlayer;
+            if (firstPersonController != null)
+            {
+                // Enabled (and therefore Look()-ing) for both Roaming and
+                // Seated; LocomotionEnabled gates Move() inside that same
+                // Update() so Seated keeps camera control without legs,
+                // without a second component reading the same mouse/keyboard.
+                firstPersonController.enabled = hasCameraControl && IsThisMachinesPlayer;
+                firstPersonController.LocomotionEnabled = roaming;
+            }
             if (interactor != null) interactor.enabled = roaming && IsThisMachinesPlayer;
 
             // --- Clean-up on the way back to roaming ------------------------
@@ -237,7 +311,7 @@ namespace WeeSpurts.Player
             // --- Cursor ------------------------------------------------------
             // Local only. A remote avatar touching your cursor would be a
             // genuinely baffling bug to track down.
-            if (IsThisMachinesPlayer) ApplyCursor(roaming);
+            if (IsThisMachinesPlayer) ApplyCursor(hasCameraControl);
 
             // Camera switching lives in PlayerCameraDirector, which subscribes
             // to this event. Raised LAST so anything listening sees a fully
@@ -257,9 +331,12 @@ namespace WeeSpurts.Player
             if (throwerModel != null) throwerModel.localPosition = Vector3.zero;
         }
 
-        private void ApplyCursor(bool roaming)
+        // Parameter renamed from the old "roaming" now that Seated also wants
+        // a locked, invisible cursor for mouse-look — see ApplyMode's
+        // hasCameraControl. Behaviour for Roaming is byte-for-byte unchanged.
+        private void ApplyCursor(bool lockCursor)
         {
-            if (roaming)
+            if (lockCursor)
             {
                 // Mouse-look: the cursor has to be captured or you'd shoot it
                 // out of the window and start clicking on your desktop.

@@ -30,6 +30,11 @@ namespace WeeSpurts.Bowling
         [SerializeField] private BowlingMatchFlow game;
         [SerializeField] private LineRenderer line;
 
+        // Null game.Lane -> world Z/X, byte-identical to this class's
+        // behaviour before LaneFrame existed. See LaneFrame's class comment.
+        private Vector3 LaneForward => game != null && game.Lane != null ? game.Lane.Forward : Vector3.forward;
+        private Vector3 LaneRight => game != null && game.Lane != null ? game.Lane.Right : Vector3.right;
+
         public void Configure(BallLauncher launcherRef, BowlingMatchFlow gameRef, LineRenderer lineRef)
         {
             launcher = launcherRef;
@@ -55,7 +60,7 @@ namespace WeeSpurts.Bowling
             // Same formula ResolveThrow uses to place the ball at throw
             // time, so the preview position IS where it will actually launch from.
             Vector3 basePos = game.BallSpawn.position;
-            transform.position = basePos + Vector3.right * (launcher.CurrentLateral * game.HalfLaneWidth);
+            transform.position = basePos + LaneRight * (launcher.CurrentLateral * game.HalfLaneWidth);
 
             DrawAimLine();
         }
@@ -99,13 +104,13 @@ namespace WeeSpurts.Bowling
             for (int i = 0; i < LineSegments; i++)
             {
                 float t = i / (float)(LineSegments - 1);
-                Vector3 forward = aim * Vector3.forward * (config.SpinRampDistance * t);
-                // Curve added in WORLD space (not aim-rotated), matching
-                // BowlingBall's spin force, which is always a world-space
-                // Vector3.right push regardless of aim angle.
+                Vector3 forward = aim * LaneForward * (config.SpinRampDistance * t);
+                // Curve added in the lane's own space (not aim-rotated),
+                // matching BowlingBall's spin force, which is always a
+                // lane-relative LaneRight push regardless of aim angle.
                 float drift = SpinModel.LateralDriftMeters(
                     launcher.CurrentSpin, t, lateralAccel, rampSeconds, config.RollSkidHookScale);
-                line.SetPosition(i, transform.position + forward + Vector3.right * drift);
+                line.SetPosition(i, transform.position + forward + LaneRight * drift);
             }
         }
     }

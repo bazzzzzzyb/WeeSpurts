@@ -99,25 +99,44 @@ namespace WeeSpurts.Bowling
         /// get to the pivot, so the camera can never end up inside the thrower.
         /// </summary>
         public static Vector3 CylindricalLerp(Vector3 from, Vector3 to, Vector3 pivot, float t, float minRadius)
+            => CylindricalLerp(from, to, pivot, t, minRadius, Vector3.forward, Vector3.right);
+
+        /// <summary>
+        /// Same as the four-argument overload, but the "angle 0" reference is
+        /// <paramref name="forward"/>/<paramref name="right"/> instead of world
+        /// Z/X. Every ThrowCameraSequenceConfig angle (BZoomAngleDegrees etc.)
+        /// was authored assuming 0 degrees = down-lane — true by coincidence
+        /// when the lane runs along world Z, but only by coincidence. Passing
+        /// the lane's own axes here is what keeps those authored numbers
+        /// meaning the same thing on a lane that runs a different way.
+        /// Defaults (Vector3.forward/right) reproduce the original overload
+        /// exactly.
+        /// </summary>
+        public static Vector3 CylindricalLerp(Vector3 from, Vector3 to, Vector3 pivot, float t, float minRadius,
+                                              Vector3 forward, Vector3 right)
         {
             float clampedT = Mathf.Clamp01(t);
 
             // Split each endpoint into (angle around the pivot, distance from the
-            // pivot on the flat ground plane, height above the pivot).
-            Vector3 fromFlat = new Vector3(from.x - pivot.x, 0f, from.z - pivot.z);
-            Vector3 toFlat = new Vector3(to.x - pivot.x, 0f, to.z - pivot.z);
+            // pivot on the flat ground plane, height above the pivot) — projected
+            // onto the given forward/right basis rather than raw world X/Z.
+            float fromRight = Vector3.Dot(from - pivot, right);
+            float fromForward = Vector3.Dot(from - pivot, forward);
+            float toRight = Vector3.Dot(to - pivot, right);
+            float toForward = Vector3.Dot(to - pivot, forward);
 
-            float fromRadius = fromFlat.magnitude;
-            float toRadius = toFlat.magnitude;
+            float fromRadius = new Vector2(fromRight, fromForward).magnitude;
+            float toRadius = new Vector2(toRight, toForward).magnitude;
 
-            // Atan2(x, z) — deliberately x-then-z, not the usual y-then-x — gives
-            // an angle in Unity's convention where 0 degrees points along +Z and
-            // angles increase clockwise looking down, exactly matching
-            // Quaternion.Euler(0, angle, 0). If a point sits exactly on the pivot
-            // its angle is meaningless; Atan2(0,0) returns 0, which is harmless
-            // because the radius is 0 there anyway.
-            float fromAngle = Mathf.Atan2(fromFlat.x, fromFlat.z) * Mathf.Rad2Deg;
-            float toAngle = Mathf.Atan2(toFlat.x, toFlat.z) * Mathf.Rad2Deg;
+            // Atan2(right, forward) — deliberately right-then-forward, not the
+            // usual y-then-x — gives an angle where 0 degrees points along
+            // `forward` and angles increase clockwise looking down, exactly
+            // matching Quaternion.Euler(0, angle, 0) applied to `forward` (see
+            // PointAround). If a point sits exactly on the pivot its angle is
+            // meaningless; Atan2(0,0) returns 0, which is harmless because the
+            // radius is 0 there anyway.
+            float fromAngle = Mathf.Atan2(fromRight, fromForward) * Mathf.Rad2Deg;
+            float toAngle = Mathf.Atan2(toRight, toForward) * Mathf.Rad2Deg;
 
             // LerpAngle (not Lerp) takes the SHORT way round the circle, so a
             // swing from 170 to -170 degrees travels 20 degrees, not 340.
@@ -125,7 +144,7 @@ namespace WeeSpurts.Bowling
             float radius = Mathf.Max(Mathf.Lerp(fromRadius, toRadius, clampedT), Mathf.Max(0f, minRadius));
             float height = Mathf.Lerp(from.y - pivot.y, to.y - pivot.y, clampedT);
 
-            return PointAround(pivot, angle, radius, height);
+            return PointAround(pivot, angle, radius, height, forward);
         }
 
         /// <summary>
@@ -136,8 +155,12 @@ namespace WeeSpurts.Bowling
         /// round" is one number to change rather than three.
         /// </summary>
         public static Vector3 PointAround(Vector3 pivot, float angleDegrees, float radius, float height)
+            => PointAround(pivot, angleDegrees, radius, height, Vector3.forward);
+
+        /// <summary>Same as the four-argument overload, but "angle 0" is <paramref name="forward"/> instead of world +Z.</summary>
+        public static Vector3 PointAround(Vector3 pivot, float angleDegrees, float radius, float height, Vector3 forward)
         {
-            Vector3 direction = Quaternion.Euler(0f, angleDegrees, 0f) * Vector3.forward;
+            Vector3 direction = Quaternion.Euler(0f, angleDegrees, 0f) * forward;
             return pivot + direction * Mathf.Max(0f, radius) + Vector3.up * height;
         }
 
@@ -164,13 +187,17 @@ namespace WeeSpurts.Bowling
         /// so there is no visible kink at the widest point.
         /// </summary>
         public static Vector3 SidePassLerp(Vector3 from, Vector3 to, float t, float sideOffset)
+            => SidePassLerp(from, to, t, sideOffset, Vector3.right);
+
+        /// <summary>Same as the four-argument overload, but the sideways bulge is along <paramref name="right"/> instead of world +X.</summary>
+        public static Vector3 SidePassLerp(Vector3 from, Vector3 to, float t, float sideOffset, Vector3 right)
         {
             float clampedT = Mathf.Clamp01(t);
             Vector3 straight = Vector3.Lerp(from, to, clampedT);
             if (Mathf.Approximately(sideOffset, 0f)) return straight;
 
             float bump = Mathf.Sin(clampedT * Mathf.PI);
-            return straight + Vector3.right * (sideOffset * bump);
+            return straight + right * (sideOffset * bump);
         }
 
         /// <summary>

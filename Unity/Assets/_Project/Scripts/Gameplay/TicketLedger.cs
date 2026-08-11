@@ -9,7 +9,7 @@ namespace WeeSpurts.Gameplay
     /// render (a shake, a red flash, a barman shaking his head), not an
     /// exceptional condition.
     /// </summary>
-    public enum CoinResult
+    public enum TicketResult
     {
         Granted,
         InsufficientFunds,
@@ -22,19 +22,19 @@ namespace WeeSpurts.Gameplay
     /// The answer to one request. A struct because it is small, immutable and
     /// created constantly — no reason to make garbage for the collector.
     /// </summary>
-    public readonly struct CoinTransaction
+    public readonly struct TicketTransaction
     {
         public readonly ulong PlayerId;
-        public readonly CoinResult Result;
+        public readonly TicketResult Result;
         /// <summary>Signed: negative for a spend, positive for an award. Zero on a refusal.</summary>
         public readonly int Delta;
         public readonly int BalanceAfter;
-        /// <summary>Short tag for logs and the coin-feed HUD, e.g. "bar:pint", "bet:won".</summary>
+        /// <summary>Short tag for logs and the ticket-feed HUD, e.g. "bar:pint", "bet:won".</summary>
         public readonly string Reason;
 
-        public bool Granted => Result == CoinResult.Granted;
+        public bool Granted => Result == TicketResult.Granted;
 
-        public CoinTransaction(ulong playerId, CoinResult result, int delta, int balanceAfter, string reason)
+        public TicketTransaction(ulong playerId, TicketResult result, int delta, int balanceAfter, string reason)
         {
             PlayerId = playerId;
             Result = result;
@@ -48,7 +48,7 @@ namespace WeeSpurts.Gameplay
     }
 
     /// <summary>
-    /// THE one and only owner of every fake coin in Wee Spurts.
+    /// THE one and only owner of every fake ticket in Wee Spurts.
     ///
     /// This is `Docs/SlopLayerPlan.md` F3, built to the three rules in that
     /// doc's "Build it single-machine first" section. Read those before adding
@@ -81,9 +81,9 @@ namespace WeeSpurts.Gameplay
     ///
     /// NOT IN SCOPE HERE, on purpose: what things cost, what a bet pays, what
     /// the slots do. Those are S1/S4 and they are Tony's numbers to tune. This
-    /// class only guarantees that coins cannot be conjured or lost.
+    /// class only guarantees that tickets cannot be conjured or lost.
     /// </summary>
-    public class CoinLedger
+    public class TicketLedger
     {
         /// <summary>
         /// Hard ceiling on a balance. Exists so a runaway payout bug reports
@@ -99,10 +99,10 @@ namespace WeeSpurts.Gameplay
         /// <summary>
         /// Raised after every GRANTED transaction, never for a refusal — a
         /// refusal is the caller's business to render, but a grant is everyone's
-        /// (the coin-feed HUD, an audio cue, and later the ClientRpc that tells
+        /// (the ticket-feed HUD, an audio cue, and later the ClientRpc that tells
         /// the other machines). Subscribe rather than polling balances.
         /// </summary>
-        public event Action<CoinTransaction> OnTransaction;
+        public event Action<TicketTransaction> OnTransaction;
 
         /// <summary>
         /// Raised for refusals. Separate event because the reactions are
@@ -110,7 +110,7 @@ namespace WeeSpurts.Gameplay
         /// "you're broke" shake — and keeping them apart means neither
         /// listener has to branch on Result.
         /// </summary>
-        public event Action<CoinTransaction> OnRefused;
+        public event Action<TicketTransaction> OnRefused;
 
         /// <summary>Every player the ledger knows about. Order is not meaningful.</summary>
         public IEnumerable<ulong> Players => _balances.Keys;
@@ -119,7 +119,7 @@ namespace WeeSpurts.Gameplay
         /// Put a player on the books. Idempotent by design: calling it twice
         /// for the same id does NOT reset their balance, because a reconnect
         /// or a late-joining client re-running setup must not wipe someone's
-        /// coins. Returns false if they were already registered, so a caller
+        /// tickets. Returns false if they were already registered, so a caller
         /// that cares can tell the difference.
         /// </summary>
         public bool Register(ulong playerId, int startingBalance = 0)
@@ -150,23 +150,23 @@ namespace WeeSpurts.Gameplay
             amount > 0 && IsRegistered(playerId) && BalanceOf(playerId) >= amount;
 
         /// <summary>
-        /// Ask to spend. The ledger decides. THIS IS THE ONLY WAY COINS LEAVE
+        /// Ask to spend. The ledger decides. THIS IS THE ONLY WAY TICKETS LEAVE
         /// A BALANCE — see Rule 1.
         /// </summary>
         /// <param name="amount">Must be positive. A negative "spend" would be a
         /// backdoor credit, so it is refused rather than quietly inverted.</param>
-        /// <param name="reason">Short tag for the log and the coin feed.</param>
-        public CoinTransaction RequestSpend(ulong playerId, int amount, string reason = "spend")
+        /// <param name="reason">Short tag for the log and the ticket feed.</param>
+        public TicketTransaction RequestSpend(ulong playerId, int amount, string reason = "spend")
         {
             if (!IsRegistered(playerId))
-                return Refuse(playerId, CoinResult.UnknownPlayer, reason);
+                return Refuse(playerId, TicketResult.UnknownPlayer, reason);
 
             if (amount <= 0)
-                return Refuse(playerId, CoinResult.InvalidAmount, reason);
+                return Refuse(playerId, TicketResult.InvalidAmount, reason);
 
             int balance = _balances[playerId];
             if (balance < amount)
-                return Refuse(playerId, CoinResult.InsufficientFunds, reason);
+                return Refuse(playerId, TicketResult.InsufficientFunds, reason);
 
             // No overdraft, ever. A negative balance has no meaning in this
             // game and would make every downstream comparison ("can they bet?")
@@ -180,48 +180,48 @@ namespace WeeSpurts.Gameplay
         /// spends do: the networked version has to be host-authoritative, and
         /// awards are exactly where a cheating client would attack.
         /// </summary>
-        public CoinTransaction Award(ulong playerId, int amount, string reason = "award")
+        public TicketTransaction Award(ulong playerId, int amount, string reason = "award")
         {
             if (!IsRegistered(playerId))
-                return Refuse(playerId, CoinResult.UnknownPlayer, reason);
+                return Refuse(playerId, TicketResult.UnknownPlayer, reason);
 
             if (amount <= 0)
-                return Refuse(playerId, CoinResult.InvalidAmount, reason);
+                return Refuse(playerId, TicketResult.InvalidAmount, reason);
 
             int balance = _balances[playerId];
             if (balance > MAX_BALANCE - amount)
-                return Refuse(playerId, CoinResult.BalanceCeiling, reason);
+                return Refuse(playerId, TicketResult.BalanceCeiling, reason);
 
             _balances[playerId] = balance + amount;
             return Grant(playerId, amount, _balances[playerId], reason);
         }
 
         /// <summary>
-        /// Move coins between two players in ONE step — the shape every wager
+        /// Move tickets between two players in ONE step — the shape every wager
         /// payout needs. Deliberately not "spend then award": as two calls, a
         /// refused second half would leave the first half already taken and
-        /// coins would vanish from the economy. Here it either fully happens
+        /// tickets would vanish from the economy. Here it either fully happens
         /// or nothing changes.
         ///
         /// Returns the PAYEE's transaction (the interesting half for UI). The
-        /// payer's is raised on <see cref="OnTransaction"/> too, so a coin feed
+        /// payer's is raised on <see cref="OnTransaction"/> too, so a ticket feed
         /// listening to the event sees both sides.
         /// </summary>
-        public CoinTransaction Transfer(ulong fromPlayerId, ulong toPlayerId, int amount, string reason = "transfer")
+        public TicketTransaction Transfer(ulong fromPlayerId, ulong toPlayerId, int amount, string reason = "transfer")
         {
             if (!IsRegistered(fromPlayerId) || !IsRegistered(toPlayerId))
-                return Refuse(toPlayerId, CoinResult.UnknownPlayer, reason);
+                return Refuse(toPlayerId, TicketResult.UnknownPlayer, reason);
 
             // Paying yourself is a no-op that would otherwise double-fire
-            // events and confuse a coin feed. Treated as invalid, loudly.
+            // events and confuse a ticket feed. Treated as invalid, loudly.
             if (fromPlayerId == toPlayerId || amount <= 0)
-                return Refuse(toPlayerId, CoinResult.InvalidAmount, reason);
+                return Refuse(toPlayerId, TicketResult.InvalidAmount, reason);
 
             if (_balances[fromPlayerId] < amount)
-                return Refuse(fromPlayerId, CoinResult.InsufficientFunds, reason);
+                return Refuse(fromPlayerId, TicketResult.InsufficientFunds, reason);
 
             if (_balances[toPlayerId] > MAX_BALANCE - amount)
-                return Refuse(toPlayerId, CoinResult.BalanceCeiling, reason);
+                return Refuse(toPlayerId, TicketResult.BalanceCeiling, reason);
 
             // Both guards passed, so neither half can fail from here.
             _balances[fromPlayerId] -= amount;
@@ -232,7 +232,7 @@ namespace WeeSpurts.Gameplay
         }
 
         /// <summary>
-        /// Total coins across every registered player. Exists for ONE reason:
+        /// Total tickets across every registered player. Exists for ONE reason:
         /// tests and a debug HUD can assert it only changes when the economy
         /// means it to. If a future feature makes this drift without an
         /// explicit Award or a sink, something is conjuring money.
@@ -246,16 +246,16 @@ namespace WeeSpurts.Gameplay
 
         private static int Clamp(int v) => v < 0 ? 0 : (v > MAX_BALANCE ? MAX_BALANCE : v);
 
-        private CoinTransaction Grant(ulong playerId, int delta, int balanceAfter, string reason)
+        private TicketTransaction Grant(ulong playerId, int delta, int balanceAfter, string reason)
         {
-            var tx = new CoinTransaction(playerId, CoinResult.Granted, delta, balanceAfter, reason);
+            var tx = new TicketTransaction(playerId, TicketResult.Granted, delta, balanceAfter, reason);
             OnTransaction?.Invoke(tx);
             return tx;
         }
 
-        private CoinTransaction Refuse(ulong playerId, CoinResult result, string reason)
+        private TicketTransaction Refuse(ulong playerId, TicketResult result, string reason)
         {
-            var tx = new CoinTransaction(playerId, result, 0, BalanceOf(playerId), reason);
+            var tx = new TicketTransaction(playerId, result, 0, BalanceOf(playerId), reason);
             OnRefused?.Invoke(tx);
             return tx;
         }

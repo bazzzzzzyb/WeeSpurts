@@ -64,7 +64,17 @@ namespace WeeSpurts.Bowling
                     // (or any future thin base pad) is still in use silently
                     // reintroduces "pins vanish on rack reset." If you ever see
                     // that symptom again, check THIS line first.
-                    Vector3 home = transform.position + offset
+                    // transform.rotation * offset, not bare offset: PinOffsets is
+                    // authored in a fixed local frame (rows recede along +Z,
+                    // columns spread along +X) and used to be added to
+                    // transform.position raw, which silently assumed the deck's
+                    // own rotation was always identity — true for every
+                    // GreyboxSceneBuilder lane (down-lane world Z), false for a
+                    // deck built on a lane running a different way (e.g.
+                    // ThunderLanesVenue's lane 5, down-lane world X), where the
+                    // triangle fanned out sideways instead of receding down-lane.
+                    // Identity rotation reproduces the old raw-offset math exactly.
+                    Vector3 home = transform.position + transform.rotation * offset
                                    + Vector3.up * (pinConfig.PinHeight * 0.5f);
                     pin.transform.position = home;
                     pin.Configure(home, pinConfig.PinMass, pinConfig.KnockedAngleDegrees,
@@ -125,7 +135,12 @@ namespace WeeSpurts.Bowling
                     pin.ApplyExplosion(origin, radius, force);
         }
 
-        /// <summary>Classic 1-2-3-4 triangle, head pin at local origin, rows going +Z.</summary>
+        /// <summary>
+        /// Classic 1-2-3-4 triangle, head pin at local origin, rows going +Z in
+        /// this LOCAL frame — ResetFullRack rotates it into world space via
+        /// transform.rotation, so "+Z" here means "down-lane" for whatever
+        /// direction the deck itself faces, not always literal world Z.
+        /// </summary>
         public static IEnumerable<Vector3> PinOffsets(float spacing)
         {
             for (int row = 0; row < 4; row++)

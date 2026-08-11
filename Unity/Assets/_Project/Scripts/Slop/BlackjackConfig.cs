@@ -20,7 +20,7 @@ namespace WeeSpurts.Slop
         [Tooltip("Smallest legal bet. Keep it EVEN — a 3:2 blackjack on an odd stake rounds down in the house's favour, which is correct but looks like a bug to anyone watching the number.")]
         public int MinBet = 10;
 
-        [Tooltip("Largest legal bet. This is the main brake on the table as a coin SOURCE: unlike the bar, blackjack can hand coins back into the match economy, and one player winning huge repeatedly is how the whole betting layer stops meaning anything.")]
+        [Tooltip("Largest legal bet. This is the main brake on the table as a ticket SOURCE: unlike the bar, blackjack can hand tickets back into the match economy, and one player winning huge repeatedly is how the whole betting layer stops meaning anything.")]
         public int MaxBet = 100;
 
         [Header("Payouts")]

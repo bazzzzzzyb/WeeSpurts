@@ -11,7 +11,7 @@ namespace WeeSpurts.Tests
     /// EditMode > Run All.
     ///
     /// The headline rule these protect: a REFUSED purchase must leave the world
-    /// exactly as it found it — no coins moved, no stock consumed. Get that
+    /// exactly as it found it — no tickets moved, no stock consumed. Get that
     /// wrong and a broke player destroys the last golden hat for everyone,
     /// which is the kind of bug you only find with four people in the room.
     /// </summary>
@@ -34,21 +34,21 @@ namespace WeeSpurts.Tests
             Item(GOLDEN_HAT, "Golden Hat", 100, stock: 1)
         });
 
-        private static CoinLedger LedgerWith(int aliceCoins = 100, int bobCoins = 100)
+        private static TicketLedger LedgerWith(int aliceTickets = 100, int bobTickets = 100)
         {
-            var ledger = new CoinLedger();
-            ledger.Register(ALICE, aliceCoins);
-            ledger.Register(BOB, bobCoins);
+            var ledger = new TicketLedger();
+            ledger.Register(ALICE, aliceTickets);
+            ledger.Register(BOB, bobTickets);
             return ledger;
         }
 
         // --- The happy path ------------------------------------------------
 
         [Test]
-        public void Purchase_WithEnoughCoins_SucceedsAndDebits()
+        public void Purchase_WithEnoughTickets_SucceedsAndDebits()
         {
             var bar = Bar();
-            var ledger = LedgerWith(aliceCoins: 100);
+            var ledger = LedgerWith(aliceTickets: 100);
 
             PurchaseResult r = bar.Purchase(ledger, ALICE, PINT);
 
@@ -62,7 +62,7 @@ namespace WeeSpurts.Tests
         [Test]
         public void Purchase_TagsTheTransactionWithVendorAndItem()
         {
-            // So the coin feed and the logs read "Bar:Pint", not "spend".
+            // So the ticket feed and the logs read "Bar:Pint", not "spend".
             var bar = Bar();
             var ledger = LedgerWith();
 
@@ -75,7 +75,7 @@ namespace WeeSpurts.Tests
         public void Purchase_UnlimitedItem_NeverRunsOut()
         {
             var bar = Bar();
-            var ledger = LedgerWith(aliceCoins: 1000);
+            var ledger = LedgerWith(aliceTickets: 1000);
 
             for (int i = 0; i < 20; i++)
                 Assert.IsTrue(bar.Purchase(ledger, ALICE, PINT).Success, $"pint {i + 1} should be available");
@@ -90,7 +90,7 @@ namespace WeeSpurts.Tests
         public void Purchase_LimitedItem_SellsOutAfterItsStock()
         {
             var bar = Bar();
-            var ledger = LedgerWith(aliceCoins: 500, bobCoins: 500);
+            var ledger = LedgerWith(aliceTickets: 500, bobTickets: 500);
 
             Assert.IsTrue(bar.Purchase(ledger, ALICE, GOLDEN_HAT).Success);
             Assert.AreEqual(0, bar.StockRemaining(GOLDEN_HAT));
@@ -106,11 +106,11 @@ namespace WeeSpurts.Tests
             // THE test. Broke player tries for the last golden hat; a rich
             // player must still be able to buy it afterwards.
             var bar = Bar();
-            var ledger = LedgerWith(aliceCoins: 5, bobCoins: 500);
+            var ledger = LedgerWith(aliceTickets: 5, bobTickets: 500);
 
             PurchaseResult broke = bar.Purchase(ledger, ALICE, GOLDEN_HAT);
 
-            Assert.AreEqual(PurchaseOutcome.NotEnoughCoins, broke.Outcome);
+            Assert.AreEqual(PurchaseOutcome.NotEnoughTickets, broke.Outcome);
             Assert.AreEqual(1, bar.StockRemaining(GOLDEN_HAT), "a refused purchase must not eat stock");
             Assert.AreEqual(5, ledger.BalanceOf(ALICE));
 
@@ -121,7 +121,7 @@ namespace WeeSpurts.Tests
         public void ResetStock_RestocksForTheNextMatch()
         {
             var bar = Bar();
-            var ledger = LedgerWith(aliceCoins: 500);
+            var ledger = LedgerWith(aliceTickets: 500);
             bar.Purchase(ledger, ALICE, GOLDEN_HAT);
             Assert.AreEqual(0, bar.StockRemaining(GOLDEN_HAT));
 
@@ -137,7 +137,7 @@ namespace WeeSpurts.Tests
         public void Purchase_UnknownItem_IsRefusedAndChargesNothing()
         {
             var bar = Bar();
-            var ledger = LedgerWith(aliceCoins: 100);
+            var ledger = LedgerWith(aliceTickets: 100);
 
             PurchaseResult r = bar.Purchase(ledger, ALICE, itemId: 999);
 
@@ -162,7 +162,7 @@ namespace WeeSpurts.Tests
         public void Purchase_FreeOrNegativelyPricedItem_IsRejectedAsMisconfiguration()
         {
             var bar = new Vendor("Bar", new List<VendorItem> { Item(FREEBIE, "Tap Water", 0) });
-            var ledger = LedgerWith(aliceCoins: 100);
+            var ledger = LedgerWith(aliceTickets: 100);
 
             PurchaseResult r = bar.Purchase(ledger, ALICE, FREEBIE);
 
@@ -211,10 +211,10 @@ namespace WeeSpurts.Tests
         public void CanBuy_ReflectsAffordabilityAndStock()
         {
             var bar = Bar();
-            var ledger = LedgerWith(aliceCoins: 50, bobCoins: 500);
+            var ledger = LedgerWith(aliceTickets: 50, bobTickets: 500);
 
-            Assert.IsTrue(bar.CanBuy(ledger, ALICE, PINT), "10 coins out of 50");
-            Assert.IsFalse(bar.CanBuy(ledger, ALICE, GOLDEN_HAT), "100 coins out of 50");
+            Assert.IsTrue(bar.CanBuy(ledger, ALICE, PINT), "10 tickets out of 50");
+            Assert.IsFalse(bar.CanBuy(ledger, ALICE, GOLDEN_HAT), "100 tickets out of 50");
 
             bar.Purchase(ledger, BOB, GOLDEN_HAT);
             Assert.IsFalse(bar.CanBuy(ledger, BOB, GOLDEN_HAT), "sold out even though he's rich");
@@ -234,7 +234,7 @@ namespace WeeSpurts.Tests
             // This is the seam S3 (drink meter) hangs off — it listens here and
             // decides what being three pints deep means.
             var bar = Bar();
-            var ledger = LedgerWith(aliceCoins: 15);
+            var ledger = LedgerWith(aliceTickets: 15);
             var bought = new List<PurchaseResult>();
             var refused = new List<PurchaseResult>();
             bar.OnPurchased += bought.Add;
@@ -247,16 +247,16 @@ namespace WeeSpurts.Tests
             Assert.AreEqual(PINT, bought[0].ItemId);
             Assert.AreEqual(ALICE, bought[0].PlayerId);
             Assert.AreEqual(1, refused.Count);
-            Assert.AreEqual(PurchaseOutcome.NotEnoughCoins, refused[0].Outcome);
+            Assert.AreEqual(PurchaseOutcome.NotEnoughTickets, refused[0].Outcome);
         }
 
         // --- The invariant ------------------------------------------------------
 
         [Test]
-        public void ShopIsASink_CoinsLeaveCirculationOnlyByTheExactPrice()
+        public void ShopIsASink_TicketsLeaveCirculationOnlyByTheExactPrice()
         {
             var bar = Bar();
-            var ledger = LedgerWith(aliceCoins: 100, bobCoins: 100);
+            var ledger = LedgerWith(aliceTickets: 100, bobTickets: 100);
             Assert.AreEqual(200, ledger.TotalInCirculation());
 
             bar.Purchase(ledger, ALICE, PINT);   // -10

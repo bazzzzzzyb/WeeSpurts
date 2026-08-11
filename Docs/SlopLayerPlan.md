@@ -1,5 +1,11 @@
 # Slop Layer & Progression — mini-project breakdown
 
+> **Superseded in part, 2026-08-11.** Currency is **tickets**, not coins (`CoinLedger` →
+> `TicketLedger`). The three construction rules below — one choke point, request-then-decide, ids
+> never references — **still stand**; they're about code correctness. The *design* constraints
+> (expected-value rules, "the room orbits the lane", parody-not-simulation) are **withdrawn**.
+> Current direction: `Docs/Projects.md` and `Docs/Prompts/2026-08-11-venue-economy-buildout.md`.
+
 Decomposes `Docs/Roadmap.md` systems **[6] Slop Layer** and **[7] Progression**, which that doc
 treats as one box each. This is not a competing plan: Roadmap stays the dependency graph, BLUEPRINT
 stays the phases and gates, PLAYBOOK stays the task ledger. This is the level underneath — the

@@ -41,6 +41,18 @@ namespace WeeSpurts.Player
         [Tooltip("Optional. The character model's reaction actor — we push walk speed into its Animator so the walk cycle plays. Empty just means no animation.")]
         [SerializeField] private CharacterThrowReactionActor reactionActor;
 
+        /// <summary>
+        /// True: WASD/jump/gravity all run (Roaming). False: Look() still
+        /// runs every Update, only Move() is skipped — this is what gives
+        /// ControlMode.Seated camera control without locomotion, through the
+        /// same Update and the same mouse/keyboard read PlayerAvatar already
+        /// gates behind IsThisMachinesPlayer, rather than a second component
+        /// reading input in parallel. Written ONLY by PlayerAvatar.ApplyMode,
+        /// same rule as `enabled` on this component — see the class doc
+        /// comment. Defaults true so nothing else has to set it explicitly.
+        /// </summary>
+        public bool LocomotionEnabled { get; set; } = true;
+
         private CharacterController _controller;
 
         // Look pitch in degrees, negative = looking up (Unity's X rotation is
@@ -99,8 +111,18 @@ namespace WeeSpurts.Player
             if (config == null || _controller == null) return;
 
             Look();
-            Move();
-            DriveWalkAnimation();
+            if (LocomotionEnabled)
+            {
+                Move();
+                DriveWalkAnimation();
+            }
+            else if (reactionActor != null)
+            {
+                // Seated: same "hand the model over standing still, not
+                // frozen mid-stride" reasoning as OnDisable below, just
+                // without disabling the component (Look() still needs to run).
+                reactionActor.SetSpeed(0f);
+            }
         }
 
         private void Look()

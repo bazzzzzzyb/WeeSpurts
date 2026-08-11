@@ -1,5 +1,10 @@
 # Design Territories — the bones of every mechanic
 
+> **Further superseded, 2026-08-11.** Currency is **tickets**, not coins. The standing design
+> constraints this doc argues for — expected-value rules across casino vs lane, "the room orbits the
+> lane", parody-not-simulation, and the age-ratings framing in §11 — are **withdrawn as constraints**.
+> Kept as a record of the thinking, not as rules.
+
 > ## ⚠️ PARTIALLY SUPERSEDED — read `Docs/Projects.md` first
 >
 > Reviewed by Tony 2026-08-03. This document remains valuable — its core reframe (the connective

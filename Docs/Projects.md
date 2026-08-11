@@ -48,9 +48,18 @@ as the cosmetics shop. Negative expected value is a tuning default, not a design
 single-player toys — nothing about game state syncs, only your presence and the score. Others see
 your character at the cabinet. Deliberately stupid, deliberately short.
 
-**Currency name: still open.** "Coins" vs "tickets" vs something else. Whatever wins, there is only
-**one** currency — never coins *and* tickets *and* chips. Name it after whichever fiction we want
-dominant.
+**Currency: TICKETS — decided 2026-08-11.** One currency, called tickets, on the arcade/alley ticket
+fiction. Tickets buy everything: drinks, cosmetics, arcade plays, blackjack stakes, slot pulls.
+`CoinLedger` and family rename to `TicketLedger`. This closes the open question below.
+
+**Inventory is a core system — added 2026-08-11.** Players carry items with stable ids. Items can be
+thrown down the lane in place of a ball, used on the lane, or consumed. Filled from the ball return
+and from vendors. This is the backbone for lane sabotage.
+
+**Lane sabotage — added 2026-08-11.** Lane conditioning is a real field the ball reads when hooking,
+and the janitorial set writes into it: oil can, rosin, floor wax, mop, loose pin, plus a wet floor
+sign with no effect so it can be used as a bluff. Second throw of a frame only, so a strike disarms
+you. Spectators can mop, not just the player being sabotaged. See `Docs/LaneSabotage.md`.
 
 ---
 
@@ -87,7 +96,9 @@ The centre of gravity. Everything else is a place to be between turns.
 - **Economy balancing pass** — income vs sinks, now that coins persist. The failure mode is
   everyone rich by session four and wagers meaning nothing.
 - **Round wager flow** — set stake, agree, settle after frame 10.
-- **Name the currency** — coins / tickets / other. One only.
+- ~~**Name the currency**~~ — **answered: tickets.** See the Direction section above.
+- **Inventory system** — per-player slots, ids from an `ItemCatalog`, `Throwable` / `LaneAction` /
+  `Instant` use contexts. Backbone for sabotage and anything like it later.
 
 ## C — The casino
 
