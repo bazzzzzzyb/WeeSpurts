@@ -121,6 +121,43 @@ namespace WeeSpurts.Slop
         /// <summary>True once this round has split. Blocks a second split — see the class comment.</summary>
         public bool HasSplit => _hasSplit;
 
+        /// <summary>
+        /// The stake <see cref="Double"/> or <see cref="Split"/> would charge
+        /// right now — always the ACTIVE hand's own stake (Split only fires
+        /// when <see cref="ActiveHandIndex"/> is 0, so this is hand 0's stake
+        /// at that moment). Exposed so a caller that DOES hold a ledger
+        /// reference — <c>BlackjackStation</c>, never this class — can check
+        /// affordability before enabling a Double/Split button. Zero before a
+        /// hand exists, same null-safety shape as <see cref="PlayerHand"/>.
+        /// </summary>
+        public int ActiveHandStake => ActiveHandIndex < _handStakes.Count ? _handStakes[ActiveHandIndex] : 0;
+
+        /// <summary>
+        /// True if <see cref="Double"/> would currently succeed ON EVERY
+        /// CHECK EXCEPT AFFORDABILITY — this class deliberately holds no
+        /// <see cref="TicketLedger"/> reference (see the class comment: pure
+        /// C#, no Unity, no economy dependency), so it structurally cannot
+        /// know whether the stake can be paid. A caller that DOES know —
+        /// <c>BlackjackStation</c>, which has both this and the ledger — must
+        /// additionally check the player's balance against
+        /// <see cref="ActiveHandStake"/> before trusting this for a HUD
+        /// button; <c>BlackjackStation.CanDouble</c> is that combined check.
+        /// QA-reviewed 2026-08-12: confirmed as the one deliberate gap between
+        /// this property and <see cref="Double"/>'s own legality check, and
+        /// pinned by a test (<c>BlackjackTests.CanDouble_DoesNotCheckAffordability</c>)
+        /// so a future refactor can't silently "fix" it into a false sense of
+        /// completeness at this layer.
+        /// </summary>
+        public bool CanDouble => Phase == BlackjackPhase.PlayerTurn && PlayerHand.Count == 2;
+
+        /// <summary>
+        /// True if <see cref="Split"/> would currently succeed ON EVERY CHECK
+        /// EXCEPT AFFORDABILITY — see <see cref="CanDouble"/>'s doc comment,
+        /// same gap, same reason, same fix at the <c>BlackjackStation</c> layer.
+        /// </summary>
+        public bool CanSplit => Phase == BlackjackPhase.PlayerTurn && !_hasSplit && ActiveHandIndex == 0
+            && PlayerHand.Count == 2 && PlayerHand.Cards[0].Rank == PlayerHand.Cards[1].Rank;
+
         public BlackjackHand DealerHand { get; } = new BlackjackHand();
 
         /// <summary>The dealer's face-up card. Meaningless before a deal.</summary>

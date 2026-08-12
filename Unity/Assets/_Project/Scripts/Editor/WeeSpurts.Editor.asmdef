@@ -5,7 +5,8 @@
         "WeeSpurts.Runtime",
         "Mirror",
         "Mirror.Transports",
-        "Mirror.Components"
+        "Mirror.Components",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Editor"

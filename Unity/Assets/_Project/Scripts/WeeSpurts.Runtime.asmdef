@@ -2,7 +2,8 @@
     "name": "WeeSpurts.Runtime",
     "rootNamespace": "WeeSpurts",
     "references": [
-        "Mirror"
+        "Mirror",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

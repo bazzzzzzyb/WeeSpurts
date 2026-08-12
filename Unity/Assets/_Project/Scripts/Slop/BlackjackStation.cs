@@ -13,16 +13,17 @@ namespace WeeSpurts.Slop
     /// INPUT WHILE SEATED IS NOT ROUTED THROUGH IInteractable. PlayerAvatar.
     /// ApplyMode turns PlayerInteractor OFF for Seated (same reason it's off
     /// for Bowling: a seated player must not re-trigger the thing that seated
-    /// them), so once someone is sitting at THIS table, THIS component reads
-    /// their Hit/Stand/leave input directly in Update — same shape as
-    /// ThrowerAimSlide owning input during Bowling. Deliberately debug-key, no
-    /// card UI: Stage 2 of the venue buildout only asks that a hand be
-    /// PLAYABLE, and a felt-and-chips UI is real work nobody has scoped yet.
-    /// OnGUI below is the DebugHud-style stand-in.
+    /// them), so once someone is sitting at THIS table, <see cref="UI.BlackjackHud"/>
+    /// (a Canvas child of this station, built by ThunderLanesVenueStationSetupTool)
+    /// is what reads their clicks and calls the public methods below — same
+    /// shape as ThrowerAimSlide owning input during Bowling, just through a
+    /// real UI instead of raw keys now. This class stays the single choke
+    /// point that actually talks to <see cref="BlackjackTable"/> and the
+    /// ledger; the HUD never touches either directly.
     ///
-    /// ONE STAKE, NO BET SELECTION: every deal bets config.MinBet. Same
-    /// reasoning as BarStation selling a single item — this stage proves the
-    /// table is reachable, it doesn't build a betting UI.
+    /// BET SELECTION: <see cref="SelectedBet"/> is set by the HUD's slider
+    /// (clamped to the config's range) and used by <see cref="Deal"/> — sitting
+    /// down no longer auto-deals at a fixed stake.
     /// </summary>
     [DisallowMultipleComponent]
     public class BlackjackStation : VenueStation
@@ -38,6 +39,36 @@ namespace WeeSpurts.Slop
 
         private BlackjackTable _table;
         private PlayerAvatar _seatedPlayer;
+
+        /// <summary>The bet the next <see cref="Deal"/> will use. Set by the HUD's slider, always clamped to the config's range.</summary>
+        public int SelectedBet { get; private set; }
+
+        public int MinBet => config != null ? config.MinBet : 0;
+        public int MaxBet => config != null ? config.MaxBet : 0;
+
+        /// <summary>Read-only view of the engine for a HUD to render — Phase, PlayerHands, DealerHand, LastRoundResults, CanDouble/CanSplit.</summary>
+        public BlackjackTable Table => GetTable();
+
+        /// <summary>Whoever is currently sitting here, or null. A HUD compares this against its own PlayerAvatar to decide whether to show itself.</summary>
+        public PlayerAvatar SeatedPlayer => _seatedPlayer;
+
+        /// <summary>True while the LOCAL machine's seated player may act here — the HUD's own "should I show myself" gate.</summary>
+        public bool CanPlay => CanAct;
+
+        /// <summary>
+        /// True if a Double button should actually be enabled: BlackjackTable.CanDouble
+        /// (every legality check EXCEPT affordability — see its own doc comment
+        /// for why the table can't check this) AND the seated player can
+        /// currently pay BlackjackTable.ActiveHandStake. This is the check the
+        /// HUD reads, not the table's own CanDouble, or a broke player would
+        /// see an enabled button that silently fails on click.
+        /// </summary>
+        public bool CanDouble => CanAct && GetTable().CanDouble
+            && Ledger.BalanceOf(_seatedPlayer.EconomyPlayerId) >= GetTable().ActiveHandStake;
+
+        /// <summary>Same affordability combination as <see cref="CanDouble"/>, for Split.</summary>
+        public bool CanSplit => CanAct && GetTable().CanSplit
+            && Ledger.BalanceOf(_seatedPlayer.EconomyPlayerId) >= GetTable().ActiveHandStake;
 
         private BlackjackTable GetTable()
         {
@@ -60,20 +91,49 @@ namespace WeeSpurts.Slop
         public override string GetPrompt(PlayerAvatar player) =>
             CanInteract(player) ? "Sit Down — Blackjack" : string.Empty;
 
-        /// <summary>Sit down and deal the first hand at the table's minimum bet.</summary>
+        /// <summary>Sit down. No hand is dealt yet — the HUD's bet slider + Deal button take it from here.</summary>
         public override void Interact(PlayerAvatar player)
         {
             if (!CanInteract(player)) return;
-
-            TicketLedger ledger = Ledger;
-            if (ledger == null) return;
+            if (Ledger == null) return;
 
             EnsureRegistered(player);
             player.EnterSeated(seat);
             _seatedPlayer = player;
-
-            GetTable().Deal(ledger, player.EconomyPlayerId, config.MinBet);
+            SelectedBet = config.MinBet;
         }
+
+        /// <summary>Called by the HUD's slider. Clamps to the config's bet range so a UI bug can't submit a nonsense stake.</summary>
+        public void SetBet(int bet)
+        {
+            if (config == null) return;
+            SelectedBet = bet < config.MinBet ? config.MinBet : (bet > config.MaxBet ? config.MaxBet : bet);
+        }
+
+        /// <summary>Deal at <see cref="SelectedBet"/>. Re-validates the seat itself — see IInteractable's class comment on never trusting the caller.</summary>
+        public DealOutcome Deal()
+        {
+            if (!CanAct) return DealOutcome.CouldNotPay;
+            return GetTable().Deal(Ledger, _seatedPlayer.EconomyPlayerId, SelectedBet);
+        }
+
+        public bool Hit() => CanAct && GetTable().Hit(Ledger);
+        public bool Stand() => CanAct && GetTable().Stand(Ledger);
+        public bool Double() => CanAct && GetTable().Double(Ledger);
+        public bool Split() => CanAct && GetTable().Split(Ledger);
+
+        /// <summary>Stand up. Safe to call even if nobody's seated (the HUD's Leave button and the Esc shortcut both funnel through here).</summary>
+        public void Leave()
+        {
+            if (_seatedPlayer == null) return;
+            _seatedPlayer.EnterRoaming();
+            _seatedPlayer = null;
+        }
+
+        /// <summary>True while the LOCAL machine's seated player may act here right now — the one guard every action method above shares.</summary>
+        private bool CanAct =>
+            _seatedPlayer != null && _seatedPlayer.IsThisMachinesPlayer
+            && _seatedPlayer.Mode == ControlMode.Seated && Ledger != null;
 
         private void Update()
         {
@@ -83,53 +143,10 @@ namespace WeeSpurts.Slop
             if (_seatedPlayer == null || !_seatedPlayer.IsThisMachinesPlayer) return;
             if (_seatedPlayer.Mode != ControlMode.Seated) { _seatedPlayer = null; return; }
 
-            TicketLedger ledger = Ledger;
-            if (ledger == null) return;
-
-            if (Input.GetKeyDown(KeyCode.Escape))
-            {
-                _seatedPlayer.EnterRoaming();
-                _seatedPlayer = null;
-                return;
-            }
-
-            BlackjackTable table = GetTable();
-            if (table.Phase == BlackjackPhase.PlayerTurn)
-            {
-                if (Input.GetKeyDown(KeyCode.Space)) table.Hit(ledger);
-                else if (Input.GetKeyDown(KeyCode.Return)) table.Stand(ledger);
-            }
-            else if (table.Phase == BlackjackPhase.Settled)
-            {
-                // Space deals the next hand. Return does nothing here — there is
-                // no hand to stand on, and silently re-dealing on the wrong key
-                // would be a surprising thing for a debug control to do.
-                if (Input.GetKeyDown(KeyCode.Space))
-                    table.Deal(ledger, _seatedPlayer.EconomyPlayerId, config.MinBet);
-            }
-        }
-
-        private void OnGUI()
-        {
-            if (_seatedPlayer == null || !_seatedPlayer.IsThisMachinesPlayer) return;
-            if (_seatedPlayer.Mode != ControlMode.Seated) return;
-
-            BlackjackTable table = GetTable();
-            string dealerLine = table.Phase == BlackjackPhase.PlayerTurn
-                ? $"{table.DealerUpCard} + ?"
-                : table.DealerHand.ToString();
-
-            GUI.Box(new Rect(10, 10, 620, 26),
-                $"BLACKJACK — {table.Phase}   YOU: {table.PlayerHand}   DEALER: {dealerLine}");
-
-            string hint = table.Phase switch
-            {
-                BlackjackPhase.PlayerTurn => "SPACE = Hit   ENTER = Stand   ESC = Leave",
-                BlackjackPhase.Settled =>
-                    $"Last round: {table.LastRound.Outcome} ({table.LastRound.Net:+#;-#;0} tickets)   SPACE = Deal Again   ESC = Leave",
-                _ => "ESC = Leave"
-            };
-            GUI.Box(new Rect(10, 40, 620, 26), hint);
+            // Esc is a keyboard shortcut alongside BlackjackHud's Leave button,
+            // not a replacement for the HUD — Hit/Stand/Double/Split are
+            // click-only now (WeeSpurts.UI.BlackjackHud).
+            if (Input.GetKeyDown(KeyCode.Escape)) Leave();
         }
     }
 }

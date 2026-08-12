@@ -482,6 +482,157 @@ namespace WeeSpurts.Tests
             Assert.IsFalse(table.Split(Ledger()));
         }
 
+        // ---------------------------------------------------------------
+        // CanDouble / CanSplit — legality READ-OUTS for a HUD, mirroring
+        // Double()/Split()'s own checks exactly. Every case here has a
+        // matching behavioural test above (Double_*/Split_*); these just
+        // confirm the read-only flag agrees with what the action itself
+        // would do, without duplicating rule logic.
+        // ---------------------------------------------------------------
+
+        [Test]
+        public void CanDouble_And_CanSplit_AreFalseBeforeDealing()
+        {
+            var table = new BlackjackTable(Rules(), seed: 1);
+            Assert.IsFalse(table.CanDouble);
+            Assert.IsFalse(table.CanSplit);
+        }
+
+        [Test]
+        public void CanDouble_IsTrueOnFreshTwoCardHand_FalseAfterHitting()
+        {
+            var table = new BlackjackTable(Rules(), seed: 6);
+            var ledger = Ledger(100000);
+            bool tested = false;
+
+            for (int round = 0; round < 500 && !tested; round++)
+            {
+                if (table.Deal(ledger, ALICE, 20) != DealOutcome.Dealt) break;
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue; // resolved by a natural
+
+                Assert.IsTrue(table.CanDouble, "a fresh two-card hand should always be double-eligible");
+
+                table.Hit(ledger);
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue; // that hit finished the hand
+
+                Assert.IsFalse(table.CanDouble, "double is illegal once a third card has been drawn");
+                tested = true;
+            }
+
+            Assert.IsTrue(tested, "500 rounds should include at least one non-terminal hit to test against");
+        }
+
+        [Test]
+        public void CanSplit_MatchesOnlyAMatchedPair()
+        {
+            var table = new BlackjackTable(Rules(), seed: 9);
+            var ledger = Ledger(100000);
+            bool sawMatched = false, sawUnmatched = false;
+
+            for (int round = 0; round < 500 && !(sawMatched && sawUnmatched); round++)
+            {
+                if (table.Deal(ledger, ALICE, 20) != DealOutcome.Dealt) break;
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue;
+
+                BlackjackHand hand = table.PlayerHands[0];
+                bool matched = hand.Cards[0].Rank == hand.Cards[1].Rank;
+                Assert.AreEqual(matched, table.CanSplit);
+                if (matched) sawMatched = true; else sawUnmatched = true;
+
+                PlayOutSimple(table, ledger);
+            }
+
+            Assert.IsTrue(sawMatched, "500 rounds should include at least one matched starting pair");
+            Assert.IsTrue(sawUnmatched, "500 rounds should include at least one unmatched starting hand");
+        }
+
+        [Test]
+        public void CanSplit_IsFalseAfterAlreadySplitting_OnEitherHand()
+        {
+            var table = new BlackjackTable(Rules(), seed: 15);
+            var ledger = Ledger(1_000_000);
+            bool tested = false;
+
+            for (int round = 0; round < 3000 && !tested; round++)
+            {
+                if (table.Deal(ledger, ALICE, 20) != DealOutcome.Dealt) break;
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue;
+
+                BlackjackHand hand = table.PlayerHands[0];
+                if (hand.Cards[0].Rank != hand.Cards[1].Rank) { PlayOutSimple(table, ledger); continue; }
+
+                Assert.IsTrue(table.Split(ledger));
+                if (table.Phase != BlackjackPhase.PlayerTurn)
+                {
+                    // a forced ace-split (or a lucky 21) auto-resolved both hands before this could be checked mid-hand
+                    Assert.IsFalse(table.CanSplit);
+                    tested = true;
+                    break;
+                }
+
+                Assert.IsFalse(table.CanSplit, "no re-splitting, even mid-hand-0");
+                PlayOutSimple(table, ledger);
+                if (table.Phase == BlackjackPhase.PlayerTurn)
+                {
+                    Assert.IsFalse(table.CanSplit, "hand 1 cannot split either, even if it happens to be a pair");
+                    PlayOutSimple(table, ledger);
+                }
+                tested = true;
+            }
+
+            Assert.IsTrue(tested, "3000 rounds should include at least one split to test against");
+        }
+
+        [Test]
+        public void CanDouble_And_CanSplit_AreFalseOnceSettled()
+        {
+            var table = new BlackjackTable(Rules(), seed: 2);
+            var ledger = Ledger(100000);
+
+            table.Deal(ledger, ALICE, 20);
+            while (table.Phase == BlackjackPhase.PlayerTurn) table.Stand(ledger);
+
+            Assert.AreEqual(BlackjackPhase.Settled, table.Phase);
+            Assert.IsFalse(table.CanDouble);
+            Assert.IsFalse(table.CanSplit);
+        }
+
+        /// <summary>
+        /// QA-reviewed finding, pinned rather than silently "fixed" at this
+        /// layer: CanDouble/CanSplit check every DOUBLE/SPLIT legality rule
+        /// EXCEPT affordability, because BlackjackTable holds no TicketLedger
+        /// reference by design (see the class comment). Double()/Split() DO
+        /// check affordability (via RequestSpend) and correctly refuse here.
+        /// The real fix lives one layer up — BlackjackStation.CanDouble/
+        /// CanSplit additionally check the seated player's balance against
+        /// ActiveHandStake, which is what BlackjackHud actually reads. This
+        /// test exists so nobody "fixes" this property in isolation later and
+        /// accidentally gives BlackjackTable a ledger dependency it was
+        /// deliberately built without.
+        /// </summary>
+        [Test]
+        public void CanDouble_DoesNotCheckAffordability_ThatIsTheStationsJob()
+        {
+            var table = new BlackjackTable(Rules(), seed: 6);
+            var ledger = Ledger(1000);
+            bool tested = false;
+
+            for (int round = 0; round < 500 && !tested; round++)
+            {
+                if (table.Deal(ledger, ALICE, 20) != DealOutcome.Dealt) break;
+                if (table.Phase != BlackjackPhase.PlayerTurn) continue; // resolved by a natural
+
+                // Drain the player far below the stake a double would need.
+                ledger.RequestSpend(ALICE, ledger.BalanceOf(ALICE) - 1, "test: drain");
+
+                Assert.IsTrue(table.CanDouble, "CanDouble reads state legality only, not affordability");
+                Assert.IsFalse(table.Double(ledger), "but the actual action still correctly refuses");
+                tested = true;
+            }
+
+            Assert.IsTrue(tested, "500 rounds should include at least one dealt hand to drain against");
+        }
+
         [Test]
         public void Double_OnFirstTwoCards_TakesASecondStakeAndDealsOneCardThenAutoStands()
         {

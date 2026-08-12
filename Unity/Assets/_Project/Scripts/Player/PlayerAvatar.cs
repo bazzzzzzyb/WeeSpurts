@@ -261,11 +261,22 @@ namespace WeeSpurts.Player
         private void ApplyMode()
         {
             bool roaming = Mode == ControlMode.Roaming;
-            // Seated shares roaming's camera/cursor (you can still look
-            // around) but not roaming's locomotion or interactor — see the
-            // firstPersonController block below, which is the one place that
-            // splits the two instead of just using `roaming`.
-            bool hasCameraControl = roaming || Mode == ControlMode.Seated;
+            // REVISED 2026-08-12: Seated used to share roaming's camera/cursor
+            // (mouse-look while seated) — that was fine when every seated
+            // station (just BlackjackStation, at the time) read keyboard
+            // input directly. It no longer holds: BlackjackStation and
+            // SlotStation now show a real uGUI Canvas (WeeSpurts.UI.BlackjackHud
+            // / SlotHud) with buttons and a drag-slider, and a locked/invisible
+            // cursor makes those impossible to click — you'd be aiming a
+            // pointer you can't see with a mouse that's actually spinning the
+            // camera. Seated now matches BOWLING's existing policy instead
+            // (see the firstPersonController block below and ApplyCursor):
+            // camera control OFF, cursor free and visible, same reason
+            // Bowling already does this for SpinSelectorHud's click-and-drag
+            // widget. No seated station has ever needed to look around
+            // independently of its own UI, so this trades a feature nothing
+            // used for making the one that's actually there work.
+            bool hasCameraControl = roaming;
             _modeApplied = true;
 
             // --- Components that move this transform ------------------------
@@ -296,10 +307,12 @@ namespace WeeSpurts.Player
             // netIdentity.
             if (firstPersonController != null)
             {
-                // Enabled (and therefore Look()-ing) for both Roaming and
-                // Seated; LocomotionEnabled gates Move() inside that same
-                // Update() so Seated keeps camera control without legs,
-                // without a second component reading the same mouse/keyboard.
+                // hasCameraControl is Roaming-only (see its comment above), so
+                // this is now off for both Bowling AND Seated — a seated
+                // player looks at whatever their station's own Canvas UI
+                // shows them, not around the room. LocomotionEnabled is kept
+                // as its own separate flag rather than folded away, since
+                // Roaming is the only mode with legs at all.
                 firstPersonController.enabled = hasCameraControl && IsThisMachinesPlayer;
                 firstPersonController.LocomotionEnabled = roaming;
             }
@@ -331,9 +344,12 @@ namespace WeeSpurts.Player
             if (throwerModel != null) throwerModel.localPosition = Vector3.zero;
         }
 
-        // Parameter renamed from the old "roaming" now that Seated also wants
-        // a locked, invisible cursor for mouse-look — see ApplyMode's
-        // hasCameraControl. Behaviour for Roaming is byte-for-byte unchanged.
+        // Named for what it does rather than for any one mode: ApplyMode
+        // calls this with hasCameraControl, which is Roaming-only again as of
+        // 2026-08-12 (see that variable's comment) — but the generic name
+        // stays, because Bowling has ALWAYS called this with false too, for
+        // exactly the same "a click-and-drag UI widget needs a free, visible
+        // cursor" reason Seated now does.
         private void ApplyCursor(bool lockCursor)
         {
             if (lockCursor)
