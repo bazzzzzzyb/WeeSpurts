@@ -12,7 +12,7 @@ namespace WeeSpurts.Editor
     /// ONE CLICK builds the entire playable greybox bowling scene:
     /// lane, rails, pins, ball, camera, light, managers — fully wired.
     ///
-    /// Menu: WeeSpurts → Build Greybox Bowling Scene
+    /// Menu: WeeSpurts → 2 Build New Scene → Bowling Greybox
     ///
     /// WHY code instead of hand-placing? (a) Beginners don't have to wire
     /// anything, (b) the scene is reproducible — change LaneConfig numbers
@@ -30,7 +30,7 @@ namespace WeeSpurts.Editor
         // at its own path and this builder never touches it.
         private const string ScenePath = ProjectRoot + "/Scenes/BowlingTestbed.unity";
 
-        [MenuItem("WeeSpurts/Build Greybox Bowling Scene")]
+        [MenuItem("WeeSpurts/2 Build New Scene/Bowling Greybox")]
         public static void Build()
         {
             // Whatever scene is CURRENTLY OPEN gets replaced by NewScene below
@@ -215,6 +215,10 @@ namespace WeeSpurts.Editor
             // The thrower object itself, whichever branch produced it. Needed
             // below so ThrowerAimSlide can be attached to either one.
             GameObject throwerObject;
+            // Only the real PlayerCharacter prefab has bones to hang a carried
+            // ball on — the capsule fallback below leaves this null, and
+            // BowlingPresentation's null-safe `?.Equip` then simply skips it.
+            WeeSpurts.Characters.AttachmentSlots throwerAttachments = null;
 
             // EVERY height on ThrowCameraSequenceConfig is measured relative to
             // this transform, and they were all tuned against the capsule, whose
@@ -254,12 +258,22 @@ namespace WeeSpurts.Editor
                                      "its root, so Body English will not play. Re-run WeeSpurts -> Set Up " +
                                      "Player Character to regenerate it, then rebuild the scene.");
 
+                // Same story as the reaction actor: null here just means the
+                // prefab predates the component, and the ball silently never
+                // appears in hand — so say it out loud rather than let a
+                // null-safe call swallow it.
+                throwerAttachments = throwerGo.GetComponent<WeeSpurts.Characters.AttachmentSlots>();
+                if (throwerAttachments == null)
+                    Debug.LogWarning("[Greybox] The PlayerCharacter prefab has no AttachmentSlots on its root, so " +
+                                     "the thrower will aim empty-handed. Re-run WeeSpurts -> Set Up Player " +
+                                     "Character to regenerate it, then rebuild the scene.");
+
                 throwerObject = throwerGo;
             }
             else
             {
                 Debug.LogWarning("[Greybox] No PlayerCharacter prefab found — using the greybox capsule thrower. " +
-                                 "Run WeeSpurts -> Set Up Player Character, then rebuild the scene.");
+                                 "Run WeeSpurts -> 1 Assets -> Set Up Player Character, then rebuild the scene.");
                 Material throwerMat = LoadOrCreateMaterial("ThrowerMat", new Color(0.9f, 0.75f, 0.55f));
                 // LoadOrCreateMaterial returns the ASSET AS-IS on every rebuild after
                 // the first (see its "if (existing != null) return existing;" early-out),
@@ -330,6 +344,7 @@ namespace WeeSpurts.Editor
             matchFlow.Configure(ballConfig, laneConfig, ball, deck, launcher, spawn.transform);
             presentation.Configure(throwCam);
             presentation.SetThrowReactionActor(throwReaction);
+            presentation.SetThrowerAttachments(throwerAttachments);
 
             // Sandbox aim-phase preview: slides the ball to match live aim
             // input and draws a curved LineRenderer for direction + spin.

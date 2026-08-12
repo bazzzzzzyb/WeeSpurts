@@ -20,7 +20,7 @@ namespace WeeSpurts.Editor
     /// TestVenue.unity — same RoamConfig/InteractionConfig assets, same
     /// component set, same SerializedObject wiring discipline.
     ///
-    /// Menu: WeeSpurts -> Thunder Lanes Venue -> Set Up Roaming Player
+    /// Menu: WeeSpurts -> 4 Thunder Lanes Venue -> 1 Set Up Roaming Player
     ///
     /// WHY NOT JUST RUN RoamingSetupTool ON THIS SCENE: that tool requires a
     /// CharacterThrowReactionActor (the thrower) AND a Camera carrying
@@ -88,7 +88,7 @@ namespace WeeSpurts.Editor
                 : $"[ThunderLanesVenue] FAILED to save {ScenePath} — check the log above for why SetUp aborted.");
         }
 
-        [MenuItem("WeeSpurts/Thunder Lanes Venue/Set Up Roaming Player")]
+        [MenuItem("WeeSpurts/4 Thunder Lanes Venue/1 Set Up Roaming Player")]
         public static void SetUp()
         {
             Scene scene = SceneManager.GetActiveScene();
@@ -177,7 +177,7 @@ namespace WeeSpurts.Editor
                     Debug.LogError(
                         $"[ThunderLanesVenue] Cannot find {PlayerCharacterPrefabPath} — nothing further was " +
                         "changed (the Player root above was already created/reused).\n" +
-                        "FIX IT LIKE THIS: run WeeSpurts -> Set Up Player Character first, then run this menu " +
+                        "FIX IT LIKE THIS: run WeeSpurts -> 1 Assets -> Set Up Player Character first, then run this menu " +
                         "item again.");
                     return;
                 }

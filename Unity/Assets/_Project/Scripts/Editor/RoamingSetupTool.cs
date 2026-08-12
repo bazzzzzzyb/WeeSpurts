@@ -16,7 +16,7 @@ namespace WeeSpurts.Editor
     /// first-person player, without hand-editing a single line of scene YAML
     /// (CLAUDE.md's hardest Unity rule).
     ///
-    /// Menu: WeeSpurts -> Set Up Roaming Player (Current Scene)
+    /// Menu: WeeSpurts -> 3 Modify Open Scene -> Set Up Roaming Player
     /// Target scene: Assets/_Project/Scenes/TestVenue.unity
     ///
     /// It builds this, reusing the character that is already in the scene:
@@ -60,7 +60,7 @@ namespace WeeSpurts.Editor
         private const int FallbackPlayableLaneIndex = 6;
 
         /// <summary>The menu item that creates the Anchor_LaneNN markers this tool looks for.</summary>
-        private const string VenueBuilderMenuItem = "WeeSpurts -> Build Alley Venue Greybox";
+        private const string VenueBuilderMenuItem = "WeeSpurts -> 3 Modify Open Scene -> Add Alley Venue Greybox";
 
         /// <summary>
         /// The user layer the local player's own body lives on, so the
@@ -70,7 +70,7 @@ namespace WeeSpurts.Editor
         /// </summary>
         private const string LocalPlayerModelLayer = "LocalPlayerModel";
 
-        [MenuItem("WeeSpurts/Set Up Roaming Player (Current Scene)")]
+        [MenuItem("WeeSpurts/3 Modify Open Scene/Set Up Roaming Player")]
         public static void SetUp()
         {
             Scene scene = SceneManager.GetActiveScene();
@@ -102,8 +102,8 @@ namespace WeeSpurts.Editor
                     "[Roaming] No thrower found — nothing was changed.\n" +
                     "This tool needs a GameObject with a CharacterThrowReactionActor on it (the " +
                     "PlayerCharacter prefab instance, normally named 'Thrower').\n" +
-                    "FIX IT LIKE THIS: run WeeSpurts -> Set Up Player Character, then " +
-                    "WeeSpurts -> Build Greybox Bowling Scene, and open the scene that has the lane in it.");
+                    "FIX IT LIKE THIS: run WeeSpurts -> 1 Assets -> Set Up Player Character, then " +
+                    "WeeSpurts -> 2 Build New Scene -> Bowling Greybox, and open the scene that has the lane in it.");
                 return;
             }
             GameObject thrower = reactionActor.gameObject;
@@ -115,7 +115,7 @@ namespace WeeSpurts.Editor
                 Debug.LogError(
                     "[Roaming] No bowling camera found — nothing was changed.\n" +
                     "This tool identifies it as 'the Camera that has a ThrowCamera component'.\n" +
-                    "FIX IT LIKE THIS: run WeeSpurts -> Build Greybox Bowling Scene, or open the " +
+                    "FIX IT LIKE THIS: run WeeSpurts -> 2 Build New Scene -> Bowling Greybox, or open the " +
                     "scene that contains the lane.\n" + cameraReport);
                 return;
             }

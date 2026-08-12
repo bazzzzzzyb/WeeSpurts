@@ -11,7 +11,7 @@ namespace WeeSpurts.Editor
     /// physically coherent, and prints a before/after table so nothing changes
     /// behind your back.
     ///
-    /// Menu: WeeSpurts -> Retune Ball + Pin Physics
+    /// Menu: WeeSpurts -> 1 Assets -> Retune Ball + Pin Physics
     ///
     /// WHY A TOOL AND NOT JUST EDITING THE ASSETS: Unity holds .asset files in
     /// memory while it is open and writes its own copy back on save, so a text
@@ -52,7 +52,7 @@ namespace WeeSpurts.Editor
             }
         }
 
-        [MenuItem("WeeSpurts/Retune Ball + Pin Physics")]
+        [MenuItem("WeeSpurts/1 Assets/Retune Ball + Pin Physics")]
         public static void Retune()
         {
             var log = new StringBuilder();

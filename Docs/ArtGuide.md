@@ -17,3 +17,23 @@
 - Log every asset + license in `/Assets/README.md`.
 - Palette is defined and LAW: see `ContentPlan.md` §1 (bright Wii-clean, decided 2026-07-21).
 - Silhouette test: if you can't tell what something is from its black outline, redesign it.
+
+## Prop textures 🔒 (decided 2026-08-11 — standing rule, not a one-off)
+AI 3D-gen (Meshy etc.) ships every prop with 4096×4096 PBR-style texture sheets, which is wrong on
+both counts for this project: too big for a flat-stylized readable-at-a-lane-length look, and PBR is
+the wrong art direction entirely (see Style, above — "flat or simple materials").
+
+- **Source textures checked into the repo: max 1024×1024.** Downsize before the file ever lands in
+  `Assets/_Project/Art/Props/` — don't commit a 4096 source and rely on the import setting alone to
+  hide it; Git LFS still stores the full source blob either way.
+- **In-engine (post-import) max: 512×512, compressed, mipmaps on.** Enforced automatically by
+  `ArtTexturePostprocessor.cs` for anything under `Assets/_Project/Art/Props/` — this is a standing
+  import rule, not a per-asset Inspector tweak someone has to remember. It only fires on first import;
+  a deliberate hand-override later is left alone.
+- **Characters get 1024×1024, same compression and mipmaps** — enforced by the same postprocessor for
+  anything under `Assets/_Project/Characters/`. A prop is background dressing seen at lane distance;
+  the character is the hero asset the throw camera puts next to the lens every turn, so he earns the
+  extra detail. Still 4× smaller than the 4096 Meshy ships, which is the point.
+- **No metallic/roughness maps on stylized props.** The art direction is flat, not PBR — a
+  MetallicRoughness sheet has no home here. Don't import or wire one to a material's texture slots,
+  even when the source (Meshy, etc.) ships one alongside the base color map.

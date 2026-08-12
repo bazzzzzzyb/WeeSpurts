@@ -29,7 +29,7 @@ Text in `blocks like this` after "Tell Claude Code:" is a prompt — paste it ve
 3. 🧑 Unity Hub → Add → select the repo's `Unity` folder → open it. First import takes a few minutes.
 4. 🧑 **One required setting** (our input code uses the classic system): Edit → Project Settings → Player → Other Settings → **Active Input Handling = Both** → let the editor restart.
 5. 🧑 **Prove the code is healthy**: Window → General → Test Runner → EditMode tab → Run All. ✅ **Expect: all EditMode tests green** (72 tests across 4 files as of 2026-07-26). Anything red: copy the message, tell Claude Code `these tests failed: <paste>`.
-6. 🧑 **The magic click**: menu bar → **WeeSpurts → Build Greybox Bowling Scene** → press **Play**. Current controls live in `Docs/Onboarding.md` §3 (the originals here went stale: the meter now rises once into a green zone, and Q/E spin became a 2D mouse/IJKL selector). Two hot-seat players, full 10 frames, live scorecard.
+6. 🧑 **The magic click**: menu bar → **WeeSpurts → 2 Build New Scene → Bowling Greybox** → press **Play**. Current controls live in `Docs/Onboarding.md` §3 (the originals here went stale: the meter now rises once into a green zone, and Q/E spin became a 2D mouse/IJKL selector). Two hot-seat players, full 10 frames, live scorecard.
 7. 🤖 Tell Claude Code: `Everything works. Commit all of this on main with a good message and push.`
 
 ✅ **Gate (Core Framework done):** tests green, you bowled a frame, Braeden pulls and can do the same.

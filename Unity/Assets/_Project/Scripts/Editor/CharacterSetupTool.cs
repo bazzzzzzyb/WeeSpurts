@@ -8,56 +8,87 @@ namespace WeeSpurts.Editor
 {
     /// <summary>
     /// ONE CLICK turns the raw rig + animation downloads into a usable player
-    /// character. As of the Meshy mascot swap that's Meshy_AI_Bowling_Mascot_
-    /// Rig_biped's 11 FBXs; the pipeline shape is unchanged from the original
-    /// Quaternius + Mixamo one, just pointed at a different source:
-    ///   1. Rig FBX (Idle_3) -> Generic rig, avatar built from the model, no
-    ///                          embedded material generated at all (see the
-    ///                          note on MascotMaterialPath for why).
-    ///   1b. Its look -> a transparent copy of Meshy's own shipped material,
-    ///                   applied to the renderer, so the thrower is see-through
-    ///                   Wii Sports style (MascotConfig.Opacity).
-    ///   2. The other 10 mascot FBXs -> Generic rig, avatar COPIED from the
-    ///                        rig FBX so the clips bind to our exact skeleton,
-    ///                        and ONE take imported per file (Meshy ships one
-    ///                        take each, unlike Mixamo's twelve). Headache_
+    /// character. The RIG and the CLIPS now come from different files — the
+    /// T-posed Meshy_AI_Character_output.fbx is the body, and the older
+    /// Meshy_AI_Bowling_Mascot_Rig_biped folder's 11 FBXs are kept purely as
+    /// the clip source (see CharacterModelPath for why the swap happened, and
+    /// why the old one is still on disk):
+    ///   1. Rig FBX (CharacterModelPath) -> HUMANOID rig, avatar built from the
+    ///                          model, optimizeGameObjects OFF, materials per
+    ///                          RigShipsItsOwnMaterialAsset.
+    ///   1b. Its look -> a transparent copy of its material, so the thrower is
+    ///                   see-through Wii Sports style (MascotConfig.Opacity).
+    ///   1c. Reports which human bones Unity's auto-mapper actually resolved,
+    ///                   and STOPS if a REQUIRED one is missing — see
+    ///                   ReportHumanoidMapping for why this is a hard stop.
+    ///   2. All 11 mascot FBXs -> Humanoid, EACH BUILDING ITS OWN AVATAR (not
+    ///                        copied from the rig — see the "CRITICAL" note
+    ///                        below for why that changed this session), and
+    ///                        ONE take imported per file (Meshy ships one take
+    ///                        each, unlike Mixamo's twelve). Idle_3 is one of
+    ///                        these now rather than being the rig itself — see
+    ///                        the isRig note in step 2. Headache_
     ///                        Relief is cut into TWO named clips (DrunkIdle,
     ///                        Defeat) from that one take. Crawl_Backward is
     ///                        intentionally skipped (unused).
+    ///   2c. Every FBX in Animations/Mixamo/ -> Humanoid, avatar built from
+    ///                        ITS OWN model (NOT copied — see below), in-place
+    ///                        root motion, looping if it reads as locomotion.
     ///   3. Builds PlayerCharacter.controller (states + parameters).
     ///   4. Builds PlayerCharacter.prefab (model + Animator + reaction actor),
     ///      sized once at the root by MascotConfig.DisplayScale.
     ///
-    /// Menu: WeeSpurts -> Set Up Player Character
+    /// Menu: WeeSpurts -> 1 Assets -> Set Up Player Character
     ///
-    /// WHY GENERIC AND NOT HUMANOID (this was tried first and it fails):
-    /// these Quaternius FBXs export a Blender IK CONTROL rig, not a clean
-    /// deform skeleton. Foot.L/Foot.R are parented to the root bone as IK
-    /// targets — siblings of the leg chain, not children of LowerLeg — and
-    /// UpperLeg hangs off "Body" rather than off Hips. Unity's Humanoid
-    /// validates the HIERARCHY, not just bone names, and requires LeftFoot to
-    /// descend from LeftLowerLeg, so the import fails with "Required human
-    /// bone 'LeftFoot' not found". No amount of explicit bone mapping fixes
-    /// that; the rig itself would have to be re-parented in Blender.
+    /// WHY HUMANOID NOW (2026-08-11 — this file used to argue the opposite):
+    /// the old comment here explained why the QUATERNIUS bodies cannot be
+    /// Humanoid, and it is still correct about them. They export a Blender IK
+    /// CONTROL rig: Foot.L/Foot.R are parented to the root bone as IK targets
+    /// — siblings of the leg chain, not children of LowerLeg. Unity's Humanoid
+    /// validates the HIERARCHY, not just bone names, so the import fails with
+    /// "Required human bone 'LeftFoot' not found". That is why every body in
+    /// Characters/ EXCEPT the mascot is still pinned to Generic below.
     ///
-    /// Generic is not a downgrade here, because Humanoid's whole job is
-    /// retargeting between DIFFERENT skeletons and Mixamo already did that at
-    /// export time — these clips ship retargeted onto this exact skeleton
-    /// (identical bone names AND hierarchy), with every bone including the
-    /// detached feet fully baked. So they play correctly as-is.
+    /// The MESHY mascot is a different rig and the old comment explicitly left
+    /// it as an open question. It is now answered: its bones are
+    /// Hips / Spine / Spine01 / Spine02 / LeftShoulder / LeftArm / LeftForeArm
+    /// / LeftHand / LeftUpLeg / LeftLeg / LeftFoot / LeftToeBase / neck / Head
+    /// — clean Mixamo-convention FK naming with no IK targets. It has no
+    /// finger bones, which is fine: Unity treats fingers as OPTIONAL.
     ///
-    /// What Generic costs us: Humanoid-only features (Animator IK, foot IK,
-    /// humanoid avatar masks) and the "drop in any rigged humanoid, zero code
-    /// changes" promise in ContentPlan.md. Revisit when Tony's own characters
-    /// arrive — Mixamo's auto-rigger produces a proper FK hierarchy, so those
-    /// WILL import as Humanoid, and only these two lines need to change.
+    /// What Humanoid buys us, and the reason for the whole change: Mixamo
+    /// clips retarget onto him. Humanoid stores a clip in a NORMALIZED muscle
+    /// space rather than as raw bone transforms, so a clip authored on any
+    /// humanoid skeleton plays on any other. That is what lets us use stock
+    /// animation instead of being limited to the ten takes Meshy generated.
     ///
-    /// NOTE on the Meshy mascot (the "own character" this predicted): it is
-    /// deliberately kept on Generic here too, on explicit instruction, WITHOUT
-    /// re-testing whether its rig would actually validate as Humanoid — this
-    /// session has no Unity instance to check that against. If Meshy's biped
-    /// turns out to export a clean FK hierarchy, Humanoid may well work now;
-    /// that is an open follow-up, not something ruled out by this comment.
+    /// CRITICAL, AND THE EASIEST THING TO GET WRONG HERE — every clip file,
+    /// Meshy or Mixamo, gets CreateFromThisModel: its OWN avatar, from its OWN
+    /// skeleton. Retargeting alone is what carries the motion onto the rig.
+    ///
+    /// THIS REVERSES WHAT THIS COMMENT SAID EARLIER THIS SESSION, and the
+    /// reversal is worth understanding rather than just trusting: "same
+    /// skeleton?" is NOT the same question as "same bone NAMES?". The ten old-
+    /// mascot clip FBXs share bone names with the rig, character for
+    /// character — but the RIG is now the T-posed regeneration (arms straight
+    /// out) and the CLIPS are the OLD arms-down export, so their actual bind-
+    /// pose proportions differ a lot (confirmed live: up to 317mm of position
+    /// error on Spine02 alone). CopyFromOther doesn't just match bone names —
+    /// it also expects the target file's bone POSITIONS to roughly match the
+    /// copied avatar's skeleton, and logs "Rig Configuration mis-match" per
+    /// bone when they don't. CopyFromOther was correct back when the rig WAS
+    /// one of these same eleven files (same export, same bind pose, only the
+    /// clip differed) — it stopped being correct the moment the rig became a
+    /// separate regeneration. CreateFromThisModel sidesteps the whole
+    /// question: retargeting normalises into muscle space specifically so a
+    /// clip carries across DIFFERING proportions, which is exactly this case.
+    /// MIXAMO clips ship their own skeleton entirely (`mixamorig:Hips`, ...)
+    /// and always needed CreateFromThisModel for the same underlying reason —
+    /// they were just never at risk of looking like a CopyFromOther candidate
+    /// in the first place. Both silent-failure modes are worth naming: a bone-
+    /// NAME mismatch under CopyFromOther binds nothing and T-poses with no
+    /// import error; a bone-POSITION mismatch (this one) at least logs a Rig
+    /// Error, but easy to miss in a wall of console output on a one-click tool.
     ///
     /// WHY code instead of clicking through the Inspector? Same reason as
     /// GreyboxSceneBuilder: it's reproducible, it survives a fresh clone, and
@@ -105,16 +136,86 @@ namespace WeeSpurts.Editor
             MascotFolder + "/Materials/Meshy_AI_Bowling_Mascot_Rig_biped_texture_0.mat";
 
         /// <summary>
-        /// "The" player character — Tony's own Meshy-generated mascot now,
-        /// rather than a Quaternius placeholder. This same FBX also supplies
-        /// the "Idle" clip (see Clips below): Meshy's Idle_3 take ships baked
-        /// into the rig file itself instead of a separate animation FBX, the
-        /// way Mixamo's did. The old Quaternius bodies (Male_Casual,
-        /// Male_Suit, their Smooth_ versions, etc.) are left in Characters/
-        /// untouched as a fallback/reference — swap this constant back to one
-        /// of those and re-run to revert.
+        /// Meshy's newer "Mascot Base Rig" — a skinned biped (48 bones,
+        /// Mixamo-convention names, no fingers/neck, both of which Unity treats
+        /// as OPTIONAL humanoid bones) that ships its colour map as a LOOSE
+        /// PNG beside the FBX.
+        ///
+        /// That last detail is the whole reason it's the body now. The previous
+        /// candidate (Meshy_AI_Character, 2026-08-11) kept its only texture
+        /// EMBEDDED in the FBX, where it never landed on disk — so every
+        /// material route produced an empty _BaseMap and he rendered as a flat
+        /// white shell. A loose PNG is bindable, which is what
+        /// <see cref="BuildLooseTextureThrowerMaterial"/> does.
         /// </summary>
-        private const string CharacterModelPath = MascotFolder + "/" + MascotFilePrefix + "Idle_3" + MascotFileSuffix;
+        private const string BaseRigFolder = ProjectRoot + "/Characters/Meshy_AI_Mascot_Base_Rig_biped";
+
+        private const string BaseRigModelPath =
+            BaseRigFolder + "/Meshy_AI_Mascot_Base_Rig_biped_Animation_Walking_withSkin.fbx";
+
+        /// <summary>
+        /// The base rig's colour map. The _metallic and _roughness maps beside
+        /// it are DELIBERATELY unused: the art direction is flat stylised, not
+        /// PBR (Docs/ArtGuide.md), the same call already made for the props.
+        /// They're left on disk rather than deleted — Tony's standing
+        /// instruction is to confirm before removing supplied source art.
+        /// </summary>
+        private const string BaseRigBaseColorPath =
+            BaseRigFolder + "/Meshy_AI_Mascot_Base_Rig_biped_texture_0.png";
+
+        /// <summary>
+        /// The body the game actually uses. Swap this between
+        /// <see cref="BaseRigModelPath"/>, <see cref="OldMascotModelPath"/>, or
+        /// a Quaternius body and re-run — everything downstream reads it.
+        /// </summary>
+        private const string CharacterModelPath = BaseRigModelPath;
+
+        /// <summary>
+        /// The previous mascot's rig FBX. No longer the character — but still
+        /// the "Idle_3" CLIP source (see Clips), so it is a normal animation
+        /// file now rather than the rig. Kept as the one-line revert target
+        /// for <see cref="CharacterModelPath"/>.
+        /// </summary>
+        private const string OldMascotModelPath = MascotFolder + "/" + MascotFilePrefix + "Idle_3" + MascotFileSuffix;
+
+        /// <summary>
+        /// Whether the rig gets its look from a material ASSET shipped
+        /// alongside it (the old Meshy mascot) or from a material the FBX
+        /// importer builds itself (everything else).
+        ///
+        /// THIS IS THE ONE PLACE THE TWO MASCOTS GENUINELY DIFFER, and getting
+        /// it wrong renders the character flat white. The OLD mascot's FBX
+        /// references its texture by a path Unity's auto-search cannot resolve,
+        /// so its embedded material imports untextured and the tool bypasses
+        /// the importer entirely (materialImportMode = None +
+        /// <see cref="BuildMascotThrowerMaterial"/> off <see cref="MascotMaterialPath"/>).
+        /// The NEW mascot EMBEDS its texture in the FBX — a 13 MB PNG in a
+        /// Video/Content node, which is essentially the whole file size — and
+        /// Unity extracts embedded media into a .fbm folder and binds it on
+        /// import without help. So None would now be throwing away the only
+        /// copy of the texture there is. It gets ImportStandard and the normal
+        /// <see cref="ApplyCharacterTransparency"/> remap path instead, which
+        /// is the same path the Quaternius bodies have always used.
+        /// </summary>
+        private static bool RigShipsItsOwnMaterialAsset =>
+            CharacterModelPath.StartsWith(MascotFolder + "/", System.StringComparison.Ordinal);
+
+        /// <summary>
+        /// True when the rig ships its colour map as a loose texture FILE next
+        /// to the FBX (the Mascot Base Rig). Those get a material built from
+        /// that texture — see <see cref="BuildLooseTextureThrowerMaterial"/>.
+        /// </summary>
+        private static bool RigShipsLooseTextures =>
+            CharacterModelPath.StartsWith(BaseRigFolder + "/", System.StringComparison.Ordinal);
+
+        /// <summary>
+        /// True when THIS TOOL supplies the thrower's material rather than
+        /// letting the FBX importer generate one. Both such rigs get
+        /// materialImportMode = None, because in both cases the importer's own
+        /// material is the thing that renders untextured.
+        /// </summary>
+        private static bool ToolSuppliesThrowerMaterial =>
+            RigShipsItsOwnMaterialAsset || RigShipsLooseTextures;
 
         /// <summary>
         /// Display scale and opacity used to live here as hard constants —
@@ -127,6 +228,13 @@ namespace WeeSpurts.Editor
         /// MEASURED default for DisplayScale (2026-07-27): LogCharacterHeight
         /// reported 3.14 m unscaled, so 0.56 lands the mascot at 1.76 m —
         /// mid-way through the 1.7-1.8 m adult range it checks for.
+        ///
+        /// That 0.56 is the FIELD DEFAULT in MascotConfig.cs, not necessarily
+        /// what is on disk. Because of the create-once rule below, the shipped
+        /// asset currently reads 0.7 (Tony's own tweak), which puts him at
+        /// roughly 2.2 m — deliberate or not, the tool does not touch it. See
+        /// LogCharacterHeight, which now prints the scale that WOULD hit 1.75 m
+        /// rather than applying it.
         /// </summary>
         private const string MascotConfigPath = ProjectRoot + "/ScriptableObjects/MascotConfig.asset";
 
@@ -158,12 +266,38 @@ namespace WeeSpurts.Editor
 
         private const string CharactersFolder = ProjectRoot + "/Characters";
         private const string MaterialsFolder = ProjectRoot + "/Materials";
-        // Retired with the Mixamo pipeline: nothing in this file reads from
-        // it any more (see MascotFolder/MascotClipPath below). Left defined,
-        // not deleted, because the old Mixamo clip FBXs still physically live
-        // here as a fallback alongside the old Quaternius bodies in
-        // Characters/ — same "don't delete the old option" call as those.
+        /// <summary>
+        /// The OLD Quaternius-era clip folder. Nothing in this file reads
+        /// from it, and nothing should: the six FBXs sitting directly in it
+        /// (Idle, Walking, Defeat, Drunk Idle, Excited, Fall Flat) are Mixamo
+        /// downloads retargeted onto the QUATERNIUS skeleton — Foot.L,
+        /// UpperArm.L, Shoulder.L, MiddleHand.L. That is the IK-control rig
+        /// described in the class doc, so they will not import as Humanoid
+        /// AND they are a different skeleton from the mascot besides. Left on
+        /// disk, not deleted, same "don't delete the old option" call as the
+        /// Quaternius bodies in Characters/.
+        /// </summary>
         private const string AnimationsFolder = ProjectRoot + "/Animations";
+
+        /// <summary>
+        /// Where Tony's Mixamo downloads land. Scanned as a FOLDER rather
+        /// than listed file-by-file, because which clips exist changes every
+        /// time he grabs another one — the import settings below are correct
+        /// for any Mixamo FBX, so there is nothing to hand-maintain here.
+        /// Missing folder is not an error: it just means none have arrived
+        /// yet (see ImportMixamoClips).
+        /// </summary>
+        private const string MixamoFolder = AnimationsFolder + "/Mixamo";
+        /// <summary>
+        /// The one shared attachment catalog, assigned onto the character's
+        /// <see cref="WeeSpurts.Characters.AttachmentSlots"/> at prefab-build
+        /// time. Built by PropSetupTool / AttachmentSetupTool, not by this file
+        /// — so it may legitimately not exist yet on a fresh clone (handled
+        /// with a warning rather than a hard stop, since the character is
+        /// perfectly usable without any cosmetics on it).
+        /// </summary>
+        private const string AttachmentCatalogPath = ProjectRoot + "/ScriptableObjects/AttachmentCatalog.asset";
+
         private const string PrefabFolder = ProjectRoot + "/Prefabs";
         private const string ControllerPath = PrefabFolder + "/PlayerCharacter.controller";
         public const string PlayerCharacterPrefabPath = PrefabFolder + "/PlayerCharacter.prefab";
@@ -178,6 +312,17 @@ namespace WeeSpurts.Editor
         /// in SetUp below). "Idle_3" is the rig FBX itself (step 1) as well as
         /// a clip source. Crawl_Backward has no entry here on purpose — Tony's
         /// call, it's unused, and its import is left untouched entirely.
+        ///
+        /// KNOWN WRONG, LEFT WRONG ON PURPOSE (2026-08-11): DrunkIdle and
+        /// Defeat below are two clips carved from the SAME Headache_Relief
+        /// take, so the thrower rubs his temples both when he is drunk and
+        /// when he loses. Meshy shipped no slump and no sway, so there is
+        /// nothing here to point them at — the fix needs the Mixamo clips,
+        /// and lands with the clip-table pass that adds SitIdle, StandToSit
+        /// and Stumble. Deliberately NOT patched with a Meshy substitute in
+        /// the meantime: swapping in a merely-different gesture would hide the
+        /// symptom without fixing it. The rig conversion this session is about
+        /// is what unblocks the real fix.
         /// </summary>
         private static readonly (string SourceFile, string ClipName, bool Loop)[] Clips =
         {
@@ -197,13 +342,13 @@ namespace WeeSpurts.Editor
         /// <summary>Builds a full asset path from just a Meshy &lt;Name&gt; token (see MascotFilePrefix/Suffix doc above).</summary>
         private static string MascotClipPath(string sourceFile) => MascotFolder + "/" + MascotFilePrefix + sourceFile + MascotFileSuffix;
 
-        [MenuItem("WeeSpurts/Set Up Player Character")]
+        [MenuItem("WeeSpurts/1 Assets/Set Up Player Character")]
         public static void SetUp()
         {
             // ----- 0. Tony's tunables (create-once, see LoadOrCreateMascotConfig) -----
             MascotConfig mascotConfig = LoadOrCreateMascotConfig();
 
-            // ----- 1. Character FBX -> Generic (see class doc for why not Humanoid) -----
+            // ----- 1. Character FBX -> Humanoid (Quaternius bodies stay Generic; see class doc) -----
             ModelImporter characterImporter = AssetImporter.GetAtPath(CharacterModelPath) as ModelImporter;
             if (characterImporter == null)
             {
@@ -238,23 +383,50 @@ namespace WeeSpurts.Editor
 
                 bool isMascotRig = path == CharacterModelPath;
 
+                // See RigShipsItsOwnMaterialAsset — None on the old mascot
+                // (its embedded material imports untextured, so the tool uses
+                // Meshy's shipped .mat instead), ImportStandard on the new one
+                // (its texture is embedded IN the FBX, so None would throw away
+                // the only copy of it and render him flat white).
+                ModelImporterMaterialImportMode wantedRigMaterials = ToolSuppliesThrowerMaterial
+                    ? ModelImporterMaterialImportMode.None
+                    : ModelImporterMaterialImportMode.ImportStandard;
+
+                // THE ONE LINE THIS WHOLE SESSION IS ABOUT. Only the mascot
+                // becomes Humanoid; every other body in Characters/ stays
+                // Generic because their IK-control rig genuinely cannot
+                // validate as Humanoid (class doc). Leaving them on Humanoid
+                // would re-log "Required human bone 'LeftFoot' not found" on
+                // every reimport and bury real errors in the console — which
+                // is the same reason the old code forced them all to Generic.
+                ModelImporterAnimationType wantedType = isMascotRig
+                    ? ModelImporterAnimationType.Human
+                    : ModelImporterAnimationType.Generic;
+
                 // Skip a body that's already correct — SaveAndReimport is slow,
                 // and this runs over every FBX directly in Characters/.
-                if (bodyImporter.animationType == ModelImporterAnimationType.Generic &&
+                if (bodyImporter.animationType == wantedType &&
                     bodyImporter.avatarSetup == ModelImporterAvatarSetup.CreateFromThisModel &&
                     bodyImporter.useFileScale &&
                     Mathf.Approximately(bodyImporter.globalScale, ImportScale) &&
                     !bodyImporter.addCollider &&
-                    (!isMascotRig || bodyImporter.materialImportMode == ModelImporterMaterialImportMode.None))
+                    !bodyImporter.optimizeGameObjects &&
+                    (!isMascotRig || bodyImporter.materialImportMode == wantedRigMaterials))
                     continue;
 
-                bodyImporter.animationType = ModelImporterAnimationType.Generic;
+                bodyImporter.animationType = wantedType;
                 // CreateFromThisModel stores an Avatar describing this exact
                 // skeleton inside the FBX. Everything else in this tool hangs
-                // off that Avatar. Generic keeps the rig's real hierarchy rather
-                // than forcing it onto Unity's humanoid skeleton, which is
-                // precisely why it works where Humanoid doesn't.
+                // off that Avatar. On the mascot it is now a HUMAN avatar, so
+                // Unity also runs its automatic bone mapper here — which is the
+                // step that can quietly half-succeed, hence ReportHumanoidMapping
+                // immediately after this loop.
                 bodyImporter.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                // Belt and braces for the mapping: ask Unity to auto-map when
+                // nothing else specifies the setup. Harmless alongside
+                // CreateFromThisModel, and it means a future avatarSetup change
+                // can't silently leave the rig unmapped.
+                bodyImporter.autoGenerateAvatarMappingIfUnspecified = true;
                 // Scale Factor is pinned here, and to the SAME value on the clips
                 // below, so no hand-tweak in the Rig/Model tab can desync the two
                 // and stretch the character again. Display size is the prefab
@@ -270,17 +442,18 @@ namespace WeeSpurts.Editor
                 // reasoning as the capsule fallback in GreyboxSceneBuilder, which
                 // explicitly destroys the collider Unity's primitives come with.
                 bodyImporter.addCollider = false;
+                // "Optimize Game Objects" strips the bone Transforms out of the
+                // imported hierarchy and drives the skin from the Animator
+                // instead. It is a real runtime win and it is also exactly what
+                // would break the next two things on the roadmap: the bone
+                // report below needs GetBoneTransform to return something, and
+                // Block 6 needs a real hand bone to parent a carried item to.
+                // Off by default today — pinned so a stray Inspector tick can't
+                // remove the bones and leave both looking like code bugs.
+                bodyImporter.optimizeGameObjects = false;
 
                 if (isMascotRig)
-                {
-                    // Don't bother generating an embedded material for the rig
-                    // at all — Unity's FBX importer produces one with no
-                    // texture bound (its internal texture reference doesn't
-                    // resolve through Unity's auto search), it would just be
-                    // dead weight in the project, and BuildMascotThrowerMaterial
-                    // below uses Meshy's own shipped material directly instead.
-                    bodyImporter.materialImportMode = ModelImporterMaterialImportMode.None;
-                }
+                    bodyImporter.materialImportMode = wantedRigMaterials;
 
                 bodyImporter.SaveAndReimport();
             }
@@ -294,8 +467,10 @@ namespace WeeSpurts.Editor
             // above) and gets a transparent copy of Meshy's own material
             // instead, applied directly to the renderer in step 4 below.
             Material mascotThrowerMaterial = null;
-            if (CharacterModelPath.StartsWith(MascotFolder + "/", System.StringComparison.Ordinal))
+            if (RigShipsItsOwnMaterialAsset)
                 mascotThrowerMaterial = BuildMascotThrowerMaterial(mascotConfig.Opacity);
+            else if (RigShipsLooseTextures)
+                mascotThrowerMaterial = BuildLooseTextureThrowerMaterial(mascotConfig.Opacity);
             else
                 ApplyCharacterTransparency(mascotConfig.Opacity);
 
@@ -318,6 +493,25 @@ namespace WeeSpurts.Editor
                 return;
             }
 
+            // ----- 1c. Did the humanoid auto-mapping actually work? -----
+            // A HARD STOP, not a warning. An avatar that is valid-but-not-human,
+            // or human-but-missing-a-required-bone, still imports without an
+            // error and still produces a prefab — it just plays every retargeted
+            // clip as a T-pose. Continuing past this point would hand Tony a
+            // broken character and no console message pointing at the cause,
+            // which is the single failure mode this whole conversion has to
+            // avoid. Fixing it is a manual pass in Rig > Configure, so the tool
+            // stops and names the bones rather than guessing at a mapping.
+            if (!avatar.isHuman)
+            {
+                Debug.LogError($"[CharacterSetup] The Avatar on {CharacterModelPath} is valid but is NOT a HUMAN " +
+                               "avatar, so no Mixamo clip will retarget onto it. Open the FBX > Rig tab and " +
+                               "confirm Animation Type is set to Humanoid.");
+                return;
+            }
+            if (!ReportHumanoidMapping(AssetDatabase.LoadAssetAtPath<GameObject>(CharacterModelPath), avatar))
+                return;
+
             // ----- 2. Meshy clips -> Generic, bound to that Avatar -----
             // Grouped by SOURCE FILE (not iterated row-by-row) because
             // Headache_Relief supplies TWO output clips (DrunkIdle, Defeat)
@@ -335,22 +529,52 @@ namespace WeeSpurts.Editor
                     continue;
                 }
 
-                // Idle_3 IS the rig FBX (CharacterModelPath) and already got
-                // Generic + CreateFromThisModel + External materials from
-                // step 1 above. Re-running CopyFromOther on it here would try
-                // to copy the avatar FROM ITSELF, undoing the self-authored
-                // avatar everything else in this tool hangs off — so only the
-                // OTHER 9 files get the rig settings below.
-                bool isRig = sourceFile == "Idle_3";
+                // Skip the rig settings for a file that IS the rig: it already
+                // got CreateFromThisModel in step 1, and CopyFromOther here
+                // would try to copy the avatar FROM ITSELF, undoing the
+                // self-authored avatar everything else in this tool hangs off.
+                //
+                // COMPARES PATHS, not the source-file token. This used to read
+                // `sourceFile == "Idle_3"`, which was true only while the OLD
+                // mascot's Idle_3 FBX was also CharacterModelPath. Now that the
+                // rig is the separate T-posed model, Idle_3 is an ordinary clip
+                // file — and the hardcoded token would have wrongly exempted it
+                // from the settings every other clip gets, leaving it on
+                // CreateFromThisModel with its own avatar. The failure mode is
+                // the silent one this file keeps warning about: a clip bound to
+                // the wrong skeleton logs nothing and plays as a T-pose.
+                // Deriving it from the path means swapping CharacterModelPath
+                // to ANY of these files stays correct with no second edit.
+                bool isRig = path == CharacterModelPath;
                 if (!isRig)
                 {
-                    clipImporter.animationType = ModelImporterAnimationType.Generic;
-                    // CopyFromOther + sourceAvatar binds the clip to the character's
-                    // skeleton rather than to the duplicate one inside the clip's own
-                    // FBX, so the animated transform paths are guaranteed to resolve
-                    // against the model we actually render.
-                    clipImporter.avatarSetup = ModelImporterAvatarSetup.CopyFromOther;
-                    clipImporter.sourceAvatar = avatar;
+                    clipImporter.animationType = ModelImporterAnimationType.Human;
+                    // CreateFromThisModel, NOT CopyFromOther — REVERSED FROM THE
+                    // PREVIOUS SESSION'S REASONING, and worth spelling out why.
+                    // These ten FBXs' bone NAMES match the rig's exactly, which
+                    // is what made CopyFromOther look correct — but CopyFromOther
+                    // isn't a bone-name check, it's a bone-name check PLUS a
+                    // proportions check: Unity compares each bone's actual
+                    // position in THIS file against the copied avatar's skeleton
+                    // and logs "Rig Configuration mis-match" (confirmed live —
+                    // 21 bones, up to 317mm off on Spine02) when they don't
+                    // roughly agree. That was fine while the rig and these clips
+                    // were the SAME Meshy export (identical bind pose). It is no
+                    // longer true: the rig is now the T-posed regeneration (arms
+                    // straight out) and these clips are the OLD arms-down export
+                    // — same names, same hierarchy shape, very different bind-
+                    // pose proportions. CreateFromThisModel builds each clip's
+                    // OWN avatar from ITS OWN skeleton instead (identical
+                    // treatment to the Mixamo clips below), and Humanoid
+                    // retargeting — which normalises into muscle space
+                    // specifically so animation carries across DIFFERING
+                    // proportions — is what actually gets the motion onto the
+                    // new rig, not a shared avatar reference. See the class doc's
+                    // "CRITICAL, AND THE EASIEST THING TO GET WRONG HERE" note:
+                    // this is the same trap in a new shape, not a new trap.
+                    clipImporter.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                    clipImporter.autoGenerateAvatarMappingIfUnspecified = true;
+                    clipImporter.optimizeGameObjects = false;
                     // The animation FBXs carry a duplicate skin we never render;
                     // importing its materials would just litter the project.
                     clipImporter.materialImportMode = ModelImporterMaterialImportMode.None;
@@ -397,19 +621,31 @@ namespace WeeSpurts.Editor
                 var outputClips = new System.Collections.Generic.List<ModelImporterClipAnimation>();
                 foreach (var row in clipGroup)
                 {
-                    outputClips.Add(new ModelImporterClipAnimation
+                    var output = new ModelImporterClipAnimation
                     {
                         name = row.ClipName,
                         takeName = resolvedTake.takeName,
                         firstFrame = resolvedTake.firstFrame,
                         lastFrame = resolvedTake.lastFrame,
                         loopTime = row.Loop,
-                    });
+                    };
+                    // NOT a behaviour change smuggled in with the conversion —
+                    // it is what KEEPS the behaviour. Root Transform settings are
+                    // Humanoid-only and were simply inert while these clips were
+                    // Generic. Now that they are Human, leaving them at their
+                    // defaults would start extracting root motion that
+                    // applyRootMotion = false then throws away, which reads as
+                    // foot-sliding. See ApplyInPlaceRootMotion.
+                    ApplyInPlaceRootMotion(output);
+                    outputClips.Add(output);
                 }
 
                 clipImporter.clipAnimations = outputClips.ToArray();
                 clipImporter.SaveAndReimport();
             }
+
+            // ----- 2c. Mixamo clips -> Humanoid, each on its OWN avatar -----
+            ImportMixamoClips();
 
             // ----- 3. Animator Controller -----
             if (!AssetDatabase.IsValidFolder(PrefabFolder))
@@ -495,9 +731,11 @@ namespace WeeSpurts.Editor
             if (animator == null) animator = modelInstance.AddComponent<Animator>();
             animator.avatar = avatar;
             animator.runtimeAnimatorController = controller;
-            // Our Mixamo clips are in-place, but root motion would still creep
-            // the thrower off the foul line over a match. The scene owns the
-            // character's position, not the animation.
+            // The scene owns the character's position, not the animation —
+            // FirstPersonController's CharacterController moves him. Note this
+            // DISCARDS root motion rather than preventing it being extracted,
+            // which is why ApplyInPlaceRootMotion bakes it into the pose at
+            // import time instead of relying on this line alone.
             animator.applyRootMotion = false;
 
             // Mascot thrower material, applied directly to every renderer the
@@ -516,6 +754,19 @@ namespace WeeSpurts.Editor
             // future FBX re-import can disturb.
             root.AddComponent<CharacterThrowReactionActor>();
 
+            // Layer 3 (Docs/CharacterPipeline.md §3) — hats, held items, and the
+            // carried bowling ball all hang off this one component. SAME ROOT,
+            // same reasoning as the reaction actor above; it resolves the
+            // Animator from its CHILDREN (see AttachmentSlots' class doc for why
+            // it must not RequireComponent one here).
+            var slots = root.AddComponent<WeeSpurts.Characters.AttachmentSlots>();
+            slots.Catalog = AssetDatabase.LoadAssetAtPath<WeeSpurts.Characters.AttachmentCatalog>(AttachmentCatalogPath);
+            if (slots.Catalog == null)
+                Debug.LogWarning($"[CharacterSetup] No AttachmentCatalog at {AttachmentCatalogPath}, so the " +
+                                 "character's AttachmentSlots was left unassigned — nothing will equip. Run " +
+                                 "WeeSpurts > 1 Assets > Import Bowling Props (and/or Build Placeholder Attachments) " +
+                                 "to create it, then run this menu item again.");
+
             // The ONE place the character's display size is set. Uniform, on the
             // wrapper root, so mesh and animated bone positions scale together
             // and limb proportions hold (see MascotConfig.DisplayScale).
@@ -528,9 +779,287 @@ namespace WeeSpurts.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log($"[CharacterSetup] Done. Model: {CharacterModelPath}\n" +
+            Debug.Log($"[CharacterSetup] Done — mascot is now a HUMANOID rig. Model: {CharacterModelPath}\n" +
                       $"Controller: {ControllerPath}\nPrefab: {PlayerCharacterPrefabPath}\n" +
-                      "Now run WeeSpurts -> Build Greybox Bowling Scene to put it in the alley.");
+                      "Now run WeeSpurts -> 2 Build New Scene -> Bowling Greybox to put it in the alley.\n" +
+                      "STILL OUTSTANDING: DrunkIdle and Defeat remain the same Headache_Relief motion, and " +
+                      "SitIdle/StandToSit/Stumble do not exist yet — all three need the Mixamo clips (see the " +
+                      "Clips table comment).");
+        }
+
+        /// <summary>
+        /// Prints exactly which human bones Unity's automatic mapper resolved
+        /// on the mascot, and returns false if a REQUIRED one is missing.
+        ///
+        /// WHY THIS EXISTS AT ALL: converting a rig to Humanoid either works
+        /// or fails SILENTLY. Unity does not error when auto-mapping comes up
+        /// short — it produces an avatar anyway, the FBX imports clean, the
+        /// prefab builds, and the first thing anyone notices is a character
+        /// standing in a T-pose with a console full of nothing. Tony cannot
+        /// review an importer setting he can't see, so the tool has to say it
+        /// out loud.
+        ///
+        /// HOW IT CHECKS: Animator.GetBoneTransform(HumanBodyBones) is the
+        /// ground truth — it returns null for a human bone that did not map.
+        /// Driving off the ENUM rather than off bone-name strings means there
+        /// is nothing here for a naming convention to break: no hand-typed
+        /// bone names, no dependence on whether Unity spells a mapped bone
+        /// "LeftUpperArm" or "Left Upper Arm" in a given API. It also proves
+        /// more than a description would — the bone is genuinely reachable in
+        /// the hierarchy, not merely named somewhere.
+        ///
+        /// HumanTrait.BoneName[i] is printed alongside the enum name purely as
+        /// a self-check: the two are index-aligned, so if that ever stops
+        /// being true it shows up as an obviously mismatched pair in the log
+        /// rather than as a wrong answer nobody can see.
+        ///
+        /// Fingers, toes, eyes and jaw are OPTIONAL to Unity and the Meshy
+        /// mascot has no finger bones at all, so those are reported as a
+        /// single information line rather than treated as a problem.
+        /// </summary>
+        private static bool ReportHumanoidMapping(GameObject modelAsset, Avatar avatar)
+        {
+            if (modelAsset == null)
+            {
+                Debug.LogError($"[CharacterSetup] Could not load {CharacterModelPath} to check its bone mapping.");
+                return false;
+            }
+
+            // A temporary instance, because GetBoneTransform needs a live
+            // Animator bound to the avatar — the asset on disk has no
+            // hierarchy to walk. Destroyed in the finally below no matter what.
+            GameObject probe = (GameObject)PrefabUtility.InstantiatePrefab(modelAsset);
+            try
+            {
+                Animator probeAnimator = probe.GetComponent<Animator>();
+                if (probeAnimator == null) probeAnimator = probe.AddComponent<Animator>();
+                probeAnimator.avatar = avatar;
+
+                var missingRequired = new System.Collections.Generic.List<string>();
+                var missingOptional = new System.Collections.Generic.List<string>();
+                int mapped = 0;
+
+                for (int i = 0; i < (int)HumanBodyBones.LastBone; i++)
+                {
+                    var bone = (HumanBodyBones)i;
+                    if (probeAnimator.GetBoneTransform(bone) != null) { mapped++; continue; }
+
+                    // HumanTrait.BoneName is Unity's own canonical list, so the
+                    // required/optional split is Unity's opinion, not ours.
+                    string label = i < HumanTrait.BoneName.Length && HumanTrait.BoneName[i] != bone.ToString()
+                        ? $"{bone} (Unity calls it '{HumanTrait.BoneName[i]}')"
+                        : bone.ToString();
+
+                    if (HumanTrait.RequiredBone(i)) missingRequired.Add(label);
+                    else missingOptional.Add(label);
+                }
+
+                Debug.Log($"[CharacterSetup] Humanoid avatar on {System.IO.Path.GetFileName(CharacterModelPath)}: " +
+                          $"isValid={avatar.isValid}, isHuman={avatar.isHuman}. " +
+                          $"{mapped} of {(int)HumanBodyBones.LastBone} human bones mapped " +
+                          $"({HumanTrait.RequiredBoneCount} of them are required by Unity).");
+
+                if (missingOptional.Count > 0)
+                {
+                    // Not a problem. Said out loud anyway so "he has no fingers"
+                    // is a known fact rather than a later surprise.
+                    Debug.Log($"[CharacterSetup] Unmapped OPTIONAL bones ({missingOptional.Count}) — this is fine, " +
+                              $"Unity does not need them: {string.Join(", ", missingOptional)}");
+                }
+
+                if (missingRequired.Count == 0)
+                {
+                    Debug.Log("[CharacterSetup] Every REQUIRED human bone mapped. Mixamo clips will retarget onto him.");
+                    return true;
+                }
+
+                // Deliberately does not attempt a fix. Writing a HumanDescription
+                // by hand here would be guessing at which rig bone is which
+                // human bone, and a wrong guess produces a character that
+                // animates subtly wrong rather than obviously wrong — far worse
+                // than stopping. Rig > Configure is a human's job.
+                Debug.LogError($"[CharacterSetup] STOPPED: {missingRequired.Count} REQUIRED human bone(s) did not map, " +
+                               $"so retargeted clips would play as a T-pose:\n  {string.Join("\n  ", missingRequired)}\n" +
+                               $"Fix by hand: select {CharacterModelPath} > Rig tab > Configure..., map those bones, " +
+                               "Apply, then run WeeSpurts > 1 Assets > Set Up Player Character again. " +
+                               "This tool will not guess the mapping for you.");
+                return false;
+            }
+            finally
+            {
+                Object.DestroyImmediate(probe);
+            }
+        }
+
+        /// <summary>
+        /// Makes a clip play IN PLACE, which is what a CharacterController-driven
+        /// game needs: the scene owns where the character is, the animation owns
+        /// only what his body does.
+        ///
+        /// THE TWO SETTINGS ARE NOT THE SAME THING, and the names invite mixing
+        /// them up (verified against the 6000.5 scripting reference rather than
+        /// recalled, per CLAUDE.md rule 3):
+        ///   * lockRootPositionXZ / lockRootHeightY / lockRootRotation are
+        ///     "Bake Into Pose". Enabled = that component of root motion is
+        ///     baked into the BONES, so the root never moves. This is the one
+        ///     that makes a clip in-place.
+        ///   * keepOriginalPositionXZ / keepOriginalPositionY /
+        ///     keepOriginalOrientation are "Based Upon" — the REFERENCE frame
+        ///     the bake is measured against, not whether it happens.
+        ///
+        /// What is chosen here and why:
+        ///   XZ      lock = true, keepOriginal = false. In-place horizontally,
+        ///           measured from his centre of mass so he stays centred over
+        ///           his own root instead of drifting off it.
+        ///   Y       lock = true, keepOriginal = TRUE. Also in-place vertically,
+        ///           but measured from the clip's ORIGINAL height so his feet
+        ///           stay on the floor. Measuring Y from centre of mass instead
+        ///           re-grounds every clip on its own average and makes him sink
+        ///           or float between states.
+        ///   Rotation lock = true, keepOriginal = false. Yaw belongs to the
+        ///           CharacterController; a clip that turns him would fight it.
+        ///
+        /// WHY BOTHER, given the prefab sets applyRootMotion = false? Because
+        /// that setting DISCARDS root motion rather than preventing it. An
+        /// unbaked clip still has its translation stripped out of the bones and
+        /// put on the root, where it is then thrown away — so the feet cycle
+        /// without the body going anywhere, which is exactly what foot-sliding
+        /// is. Baking is also what makes this robust to a Mixamo download where
+        /// the "In Place" box was missed.
+        /// </summary>
+        private static void ApplyInPlaceRootMotion(ModelImporterClipAnimation clip)
+        {
+            clip.lockRootPositionXZ = true;
+            clip.keepOriginalPositionXZ = false;
+
+            clip.lockRootHeightY = true;
+            clip.keepOriginalPositionY = true;
+
+            clip.lockRootRotation = true;
+            clip.keepOriginalOrientation = false;
+        }
+
+        /// <summary>
+        /// Imports every FBX in Animations/Mixamo/ as a Humanoid clip.
+        ///
+        /// FOLDER-DRIVEN, not table-driven, and deliberately so: which Mixamo
+        /// clips exist changes every time Tony downloads another one, and the
+        /// settings below are correct for ALL of them. Which animator STATE
+        /// uses which clip is a separate question that lives in the Clips table
+        /// and the controller — this method only makes the files usable.
+        ///
+        /// CreateFromThisModel, NOT CopyFromOther. This is the single most
+        /// important line in the method. A Mixamo FBX carries its own skeleton
+        /// named mixamorig:Hips, mixamorig:LeftArm, and so on. CopyFromOther
+        /// would apply the MASCOT's bone-name mapping to it, match nothing, and
+        /// import a humanoid clip bound to no bones — a T-pose, with no error.
+        /// Building each file its own avatar from its own skeleton is what lets
+        /// Humanoid retargeting carry the motion onto the mascot at runtime,
+        /// which is the entire reason for the Humanoid conversion.
+        ///
+        /// A missing folder is not an error — it just means no downloads yet.
+        /// </summary>
+        private static void ImportMixamoClips()
+        {
+            if (!AssetDatabase.IsValidFolder(MixamoFolder))
+            {
+                Debug.Log($"[CharacterSetup] No {MixamoFolder} folder yet, so no Mixamo clips were imported. " +
+                          "Drop the downloads in there and re-run this menu item.");
+                return;
+            }
+
+            string[] guids = AssetDatabase.FindAssets("t:Model", new[] { MixamoFolder });
+            if (guids.Length == 0)
+            {
+                Debug.Log($"[CharacterSetup] {MixamoFolder} exists but has no FBXs in it yet.");
+                return;
+            }
+
+            int imported = 0;
+            var report = new System.Collections.Generic.List<string>();
+
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!(AssetImporter.GetAtPath(path) is ModelImporter importer)) continue;
+
+                importer.animationType = ModelImporterAnimationType.Human;
+                importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                importer.autoGenerateAvatarMappingIfUnspecified = true;
+                // Downloaded "Without Skin", but a stray skinned download would
+                // otherwise litter the project with materials we never render.
+                importer.materialImportMode = ModelImporterMaterialImportMode.None;
+                importer.globalScale = ImportScale;
+                importer.useFileScale = true;
+                importer.addCollider = false;
+                importer.optimizeGameObjects = false;
+
+                // Commit the rig settings BEFORE reading the take list — same
+                // reason as the Meshy loop above: defaultClipAnimations reports
+                // what the last COMPLETED import found, not what is pending.
+                importer.SaveAndReimport();
+
+                ModelImporterClipAnimation[] takes =
+                    importer.defaultClipAnimations ?? new ModelImporterClipAnimation[0];
+                string[] takeNames = System.Array.ConvertAll(takes, t => t?.takeName);
+                int take = SelectTakeIndex(takeNames);
+                if (take < 0)
+                {
+                    Debug.LogWarning($"[CharacterSetup] {path} has no unambiguous take, so its clip was left " +
+                                     $"as-is. Takes found: {string.Join(", ", takeNames)}");
+                    continue;
+                }
+
+                // Named after the FILE, because that is what Tony named it on
+                // Mixamo and it is how he will look for it in the Inspector.
+                // The animator states bind by clip name (see AddState), so this
+                // is the name the Clips table will reference.
+                string clipName = System.IO.Path.GetFileNameWithoutExtension(path);
+                bool loop = LooksLikeLocomotion(clipName);
+
+                ModelImporterClipAnimation source = takes[take];
+                var output = new ModelImporterClipAnimation
+                {
+                    name = clipName,
+                    takeName = source.takeName,
+                    firstFrame = source.firstFrame,
+                    lastFrame = source.lastFrame,
+                    loopTime = loop,
+                };
+                ApplyInPlaceRootMotion(output);
+
+                importer.clipAnimations = new[] { output };
+                importer.SaveAndReimport();
+
+                imported++;
+                report.Add($"{clipName}{(loop ? " (looping)" : "")}");
+            }
+
+            Debug.Log($"[CharacterSetup] Imported {imported} Mixamo clip(s) as Humanoid, in-place: " +
+                      $"{string.Join(", ", report)}\n" +
+                      "Looping was guessed from the file name — see LooksLikeLocomotion. Anything guessed " +
+                      "wrong is one tick of Loop Time in the FBX's Animation tab, or a row in the Clips table.");
+        }
+
+        /// <summary>
+        /// Whether a clip name reads as something that should LOOP — an idle or
+        /// a locomotion cycle — rather than a one-shot like a throw or a fall.
+        ///
+        /// A HEURISTIC, and flagged as one in the console when it runs. It
+        /// exists because Mixamo files arrive named for what they are ("Idle",
+        /// "Drunk Walk", "Stagger") and getting looping right on first import is
+        /// worth more to a playtest than making Tony tick twelve checkboxes. It
+        /// is not authority: once a clip has a row in the Clips table, that row
+        /// decides. Pure and string-only so it stays cheap to reason about.
+        /// </summary>
+        private static bool LooksLikeLocomotion(string clipName)
+        {
+            if (string.IsNullOrEmpty(clipName)) return false;
+            string n = clipName.ToLowerInvariant();
+            string[] loopingTokens = { "idle", "walk", "run", "sprint", "jog", "stagger", "strafe", "turn" };
+            foreach (string token in loopingTokens)
+                if (n.Contains(token)) return true;
+            return false;
         }
 
         /// <summary>
@@ -572,6 +1101,74 @@ namespace WeeSpurts.Editor
         /// silently revert; SetUp already rebuilds the whole prefab from
         /// scratch every run, which re-applies this too.
         /// </summary>
+        /// <summary>
+        /// Builds the thrower's material for a rig that ships LOOSE texture
+        /// files (the Mascot Base Rig) rather than a finished .mat.
+        ///
+        /// This is the fix for the failure that killed the previous body swap.
+        /// Meshy's FBXs carry a texture reference Unity's auto-search does not
+        /// resolve, so letting the importer generate the material yields one
+        /// with an empty _BaseMap and a flat white character — confirmed twice
+        /// by playtest now. Binding the PNG ourselves sidesteps the importer
+        /// entirely, which is the same reasoning as
+        /// <see cref="BuildMascotThrowerMaterial"/>; only the SOURCE differs
+        /// (a texture file here, a shipped material there).
+        ///
+        /// Colour map only, deliberately. The _metallic and _roughness maps
+        /// beside it go unused because the art direction is flat stylised, not
+        /// PBR — the same call Docs/ArtGuide.md already records for props.
+        ///
+        /// Shader is looked up by name rather than hard-referenced so this
+        /// fails LOUDLY (and returns null, leaving the import's own material in
+        /// place) on a non-URP project instead of silently producing magenta.
+        /// </summary>
+        private static Material BuildLooseTextureThrowerMaterial(float opacity)
+        {
+            var baseColor = AssetDatabase.LoadAssetAtPath<Texture2D>(BaseRigBaseColorPath);
+            if (baseColor == null)
+            {
+                Debug.LogWarning($"[CharacterSetup] Base colour texture not found at {BaseRigBaseColorPath} — " +
+                                 "the thrower will render untextured. Check the file actually imported.");
+                return null;
+            }
+
+            Shader urpLit = Shader.Find("Universal Render Pipeline/Lit");
+            if (urpLit == null)
+            {
+                Debug.LogError("[CharacterSetup] Shader 'Universal Render Pipeline/Lit' not found — is this " +
+                               "still a URP project? Leaving the thrower on its imported material.");
+                return null;
+            }
+
+            if (!AssetDatabase.IsValidFolder(MaterialsFolder))
+                AssetDatabase.CreateFolder(ProjectRoot, "Materials");
+
+            string path = $"{MaterialsFolder}/Thrower_MascotBase.mat";
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                mat = new Material(urpLit);
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            else
+            {
+                // Re-stamp every run so a shader/texture change upstream can't
+                // leave a stale asset behind — same reasoning as the sibling
+                // builder's CopyPropertiesFromMaterial.
+                mat.shader = urpLit;
+            }
+
+            // _BaseMap is URP's albedo slot; _MainTex is set too so anything
+            // reading the built-in name (and Material.mainTexture) agrees.
+            mat.SetTexture("_BaseMap", baseColor);
+            if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", baseColor);
+
+            MaterialTransparency.Apply(mat, opacity);
+            EditorUtility.SetDirty(mat);
+            AssetDatabase.SaveAssets();
+            return mat;
+        }
+
         private static Material BuildMascotThrowerMaterial(float opacity)
         {
             Material source = AssetDatabase.LoadAssetAtPath<Material>(MascotMaterialPath);
@@ -807,12 +1404,21 @@ namespace WeeSpurts.Editor
 
             float scaled = bounds.size.y;
             float raw = scaled / displayScale;
+            // The scale that WOULD land him mid-range. Printed, never applied:
+            // DisplayScale is Tony's dial (create-once, see LoadOrCreateMascotConfig),
+            // and a tool that silently retunes the thing it is measuring is a
+            // tool you can't trust the measurement from.
+            const float TargetHeight = 1.75f;
+            float suggested = TargetHeight / raw;
             // Deliberately no "…and the lane is N m wide" comparison here: that
             // number lives on LaneConfig and would go stale the moment it's
             // tuned. Adult human height doesn't.
             Debug.Log($"[CharacterSetup] Character height: {raw:0.00} m unscaled -> {scaled:0.00} m at " +
-                      $"DisplayScale {displayScale}. An adult should read about 1.7-1.8 m — " +
-                      "retune MascotConfig.asset's Display Scale in the Inspector if that looks off.");
+                      $"DisplayScale {displayScale}. An adult should read about 1.7-1.8 m; " +
+                      $"DisplayScale {suggested:0.00} would put him at {TargetHeight:0.00} m. " +
+                      "Nothing was changed for you — retune MascotConfig.asset in the Inspector if you want it.\n" +
+                      "NOTE: Humanoid retargeting normalises PROPORTIONS for playback, it does not resize the " +
+                      "mesh, so this unscaled number is expected to be about what it was under Generic.");
         }
 
         /// <summary>

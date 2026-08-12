@@ -200,7 +200,7 @@ namespace WeeSpurts.Bowling
             {
                 Debug.LogWarning("ThrowCameraSequence: a reference is missing, so the scripted throw " +
                                  "camera is disabled for this scene. ThrowCamera's original behaviour " +
-                                 "is unaffected. Re-run WeeSpurts > Build Greybox Bowling Scene to rewire.", this);
+                                 "is unaffected. Re-run WeeSpurts > 2 Build New Scene > Bowling Greybox to rewire.", this);
                 return;
             }
 

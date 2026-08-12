@@ -20,7 +20,7 @@ MonoBehaviour:
   SpinRampDistance: 18
   RollSkidHookScale: 0.6
   SpinDriveForce: 3
-  SpawnHeight: 1.3
+  SpawnHeight: 0.13
   Bounciness: 0.25
   RollingDrag: 0.12
   ThrowTimeout: 9

@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 83a6713fbd13492458243cad060a567d, type: 3}
+  m_Name: AttachmentCatalog
+  m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Characters.AttachmentCatalog
+  Attachments:
+  - ItemId: 901
+    DisplayName: Placeholder Hat
+    Prefab: {fileID: 9196829083226193250, guid: 8b6f4c890d2976c47a98f595e58619b9, type: 3}
+    Bone: 10
+    PositionOffset: {x: 0, y: 0, z: 0}
+    RotationOffsetEuler: {x: 0, y: 0, z: 0}
+    ScaleOffset: {x: 1, y: 1, z: 1}
+  - ItemId: 902
+    DisplayName: Placeholder Visor
+    Prefab: {fileID: 9196829083226193250, guid: 8b6f4c890d2976c47a98f595e58619b9, type: 3}
+    Bone: 10
+    PositionOffset: {x: 0, y: 0, z: 0}
+    RotationOffsetEuler: {x: 0, y: 0, z: 0}
+    ScaleOffset: {x: 1, y: 1, z: 1}
+  - ItemId: 903
+    DisplayName: Placeholder Right Prop
+    Prefab: {fileID: 9196829083226193250, guid: 8b6f4c890d2976c47a98f595e58619b9, type: 3}
+    Bone: 18
+    PositionOffset: {x: 0, y: 0, z: 0}
+    RotationOffsetEuler: {x: 0, y: 0, z: 0}
+    ScaleOffset: {x: 1, y: 1, z: 1}
+  - ItemId: 904
+    DisplayName: Placeholder Left Prop
+    Prefab: {fileID: 9196829083226193250, guid: 8b6f4c890d2976c47a98f595e58619b9, type: 3}
+    Bone: 17
+    PositionOffset: {x: 0, y: 0, z: 0}
+    RotationOffsetEuler: {x: 0, y: 0, z: 0}
+    ScaleOffset: {x: 1, y: 1, z: 1}
+  - ItemId: 905
+    DisplayName: Placeholder Backpack
+    Prefab: {fileID: 9196829083226193250, guid: 8b6f4c890d2976c47a98f595e58619b9, type: 3}
+    Bone: 7
+    PositionOffset: {x: 0, y: 0, z: 0}
+    RotationOffsetEuler: {x: 0, y: 0, z: 0}
+    ScaleOffset: {x: 1, y: 1, z: 1}
+  - ItemId: 1
+    DisplayName: Bowling Ball
+    Prefab: {fileID: 2651069804174225819, guid: 401f09ee869c87a4cabff01c2ab6a833, type: 3}
+    Bone: 18
+    PositionOffset: {x: 0, y: 0.1, z: 0}
+    RotationOffsetEuler: {x: 0, y: 0, z: 0}
+    ScaleOffset: {x: 0.16541529, y: 0.16541529, z: 0.16541529}
+  - ItemId: 2
+    DisplayName: Bowling Pin Hat
+    Prefab: {fileID: 5240699770841893361, guid: 00370b0c25dcc524886330256ecb6d8c, type: 3}
+    Bone: 10
+    PositionOffset: {x: 0, y: 0, z: 0}
+    RotationOffsetEuler: {x: 0, y: 0, z: 0}
+    ScaleOffset: {x: 0.22522229, y: 0.22522229, z: 0.22522229}

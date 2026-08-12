@@ -34,8 +34,13 @@ namespace WeeSpurts.Editor
     /// second thrower — completes the fields that tool deliberately left null
     /// (throwerAimSlide, throwerModel, bowlingCamera, bowlingListener).
     ///
-    /// Run via -executeMethod; not on the WeeSpurts menu — one-shot for one
-    /// scene, like the (now-deleted) rotator was.
+    /// Menu: WeeSpurts -> 4 Thunder Lanes Venue -> 2 Set Up Bowling Lane
+    ///
+    /// It USED to say "run via -executeMethod; not on the WeeSpurts menu",
+    /// and that was true — none of this class's three entry points had a
+    /// MenuItem, so none of them were reachable without writing code to call
+    /// them. Given proper menu entries on 2026-08-11, because an unreachable
+    /// tool is indistinguishable from a missing one.
     /// </summary>
     public static class ThunderLanesVenueBowlingSetupTool
     {
@@ -66,6 +71,8 @@ namespace WeeSpurts.Editor
         // the default +Z — see LaneRotation's comment for the same identity.
         private static readonly Vector3 AimViewEuler = new Vector3(16f, 90f, 0f);
 
+        /// <summary>Puts the venue scene at build index 0. Also had no MenuItem before 2026-08-11.</summary>
+        [MenuItem("WeeSpurts/4 Thunder Lanes Venue/Set As Main Map (build index 0)")]
         public static void SetAsMainMap()
         {
             var scenes = EditorBuildSettings.scenes;
@@ -98,6 +105,7 @@ namespace WeeSpurts.Editor
         ///   2. The art's own decorative Pin_5_* meshes are still visible,
         ///      doubled up with the real physics pins.
         /// </summary>
+        [MenuItem("WeeSpurts/4 Thunder Lanes Venue/Fix Pin Deck + Hide Decor Pins")]
         public static void FixPinDeckAndHideDecorPins()
         {
             Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
@@ -165,6 +173,30 @@ namespace WeeSpurts.Editor
                 "actually fall when hit.");
         }
 
+        /// <summary>
+        /// HAD NO MenuItem UNTIL 2026-08-11 and was therefore unreachable from
+        /// the editor at all — you could only run it by writing code that called
+        /// it. That is very likely part of why the venue's bowling wiring kept
+        /// feeling like a mystery. Given a name and a number here so the venue
+        /// setup reads as the ordered sequence it actually is: roaming player
+        /// (1), then this (2), then economy stations (3).
+        ///
+        /// NOT IDEMPOTENT, and now GUARDED because of it. It unconditionally
+        /// creates BowlingGame / PinDeck / BowlingBall / ThrowingStance /
+        /// LaneKiosk_5, so a second run stacks a whole second set on top of the
+        /// first — three runs leaves three of each, all live, all fighting over
+        /// the same lane and the same player. That is not hypothetical: it
+        /// happened on 2026-08-11, the same day this got a MenuItem, which is
+        /// exactly the risk of putting a once-only tool one click away. The
+        /// guard below is modelled on ThunderLanesVenueLaneLengthTool's
+        /// ('OuterWall_East_LaneBank already exists — this tool already ran').
+        ///
+        /// To RE-RUN it deliberately, delete the BowlingGame object first — the
+        /// guard names it. For the ordinary "something's off with the pins"
+        /// case, use Fix Pin Deck + Hide Decor Pins instead; that method exists
+        /// specifically to be the safe, re-runnable follow-up to this one.
+        /// </summary>
+        [MenuItem("WeeSpurts/4 Thunder Lanes Venue/2 Set Up Bowling Lane")]
         public static void BuildAndWire()
         {
             Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
@@ -174,12 +206,29 @@ namespace WeeSpurts.Editor
                 return;
             }
 
+            // THE GUARD. Checked before anything is created, so a refusal
+            // leaves the scene byte-for-byte untouched.
+            if (GameObject.Find("BowlingGame") != null)
+            {
+                Debug.LogError(
+                    "[ThunderLanesVenue] REFUSING TO RUN: a 'BowlingGame' object already exists, so this scene " +
+                    "has already been set up. This tool is NOT idempotent — running it again would create a " +
+                    "SECOND BowlingGame, PinDeck, BowlingBall, ThrowingStance and LaneKiosk_5, all live at once, " +
+                    "all competing for the same lane and player.\n" +
+                    "NOTHING WAS CHANGED.\n" +
+                    "  * Pins wrong / decor pins doubled? Use 'Fix Pin Deck + Hide Decor Pins' — that one is " +
+                    "safe to re-run and is what it's for.\n" +
+                    "  * Genuinely want a clean rebuild? Delete the BowlingGame object in the Hierarchy first, " +
+                    "then run this again.");
+                return;
+            }
+
             // ----- 0. Find the existing roaming rig — this tool completes it, never builds a second one -----
             PlayerAvatar avatar = Object.FindFirstObjectByType<PlayerAvatar>();
             if (avatar == null)
             {
                 Debug.LogError("[ThunderLanesVenue] No PlayerAvatar found — run " +
-                                "'WeeSpurts/Thunder Lanes Venue/Set Up Roaming Player' first. Nothing changed.");
+                                "'WeeSpurts/4 Thunder Lanes Venue/1 Set Up Roaming Player' first. Nothing changed.");
                 return;
             }
             CharacterThrowReactionActor reactionActor = Object.FindFirstObjectByType<CharacterThrowReactionActor>();
@@ -307,6 +356,15 @@ namespace WeeSpurts.Editor
             matchFlow.SetLane(lane);
             presentation.Configure(throwCam);
             presentation.SetThrowReactionActor(reactionActor);
+            // Carried bowling ball (Layer 3). Same object the reaction actor is
+            // on — the PlayerCharacter prefab root. Null just means the thrower
+            // aims empty-handed, so this warns rather than aborting the setup.
+            var throwerAttachments = thrower.GetComponent<WeeSpurts.Characters.AttachmentSlots>();
+            if (throwerAttachments == null)
+                Debug.LogWarning("[ThunderLanesVenue] The Thrower has no AttachmentSlots, so no ball will appear " +
+                                 "in his hand while aiming. Re-run WeeSpurts > 1 Assets > Set Up Player Character, then " +
+                                 "'Set Up Roaming Player' to refresh the thrower, then this tool again.");
+            presentation.SetThrowerAttachments(throwerAttachments);
 
             Material aimLineMat = LoadOrCreateMaterial("AimLineMat", new Color(1f, 0.9f, 0.1f));
             Shader unlitShader = Shader.Find("Universal Render Pipeline/Unlit");

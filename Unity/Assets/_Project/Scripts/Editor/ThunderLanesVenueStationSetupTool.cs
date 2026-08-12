@@ -17,7 +17,7 @@ namespace WeeSpurts.Editor
     /// card table, and a <see cref="GameManager"/> (+ <see cref="TicketBalanceHud"/>
     /// on the Player root) so there is a ledger for either of them to talk to.
     ///
-    /// Menu: WeeSpurts -> Thunder Lanes Venue -> Set Up Economy Stations
+    /// Menu: WeeSpurts -> 4 Thunder Lanes Venue -> 3 Set Up Economy Stations
     ///
     /// PLACEMENT IS MEASURED, NOT GUESSED — same discipline as
     /// ThunderLanesVenueBowlingSetupTool's Lane_Bed_5 floor-height read. The
@@ -81,7 +81,7 @@ namespace WeeSpurts.Editor
                 : $"[ThunderLanesVenue] FAILED to save {ScenePath} — check the log above for why SetUp aborted.");
         }
 
-        [MenuItem("WeeSpurts/Thunder Lanes Venue/Set Up Economy Stations")]
+        [MenuItem("WeeSpurts/4 Thunder Lanes Venue/3 Set Up Economy Stations")]
         public static void SetUp()
         {
             Scene scene = SceneManager.GetActiveScene();
@@ -91,7 +91,7 @@ namespace WeeSpurts.Editor
             if (avatar == null)
             {
                 Debug.LogError("[ThunderLanesVenue] No PlayerAvatar found — run " +
-                                "'WeeSpurts/Thunder Lanes Venue/Set Up Roaming Player' first. Nothing changed.");
+                                "'WeeSpurts/4 Thunder Lanes Venue/1 Set Up Roaming Player' first. Nothing changed.");
                 return;
             }
 

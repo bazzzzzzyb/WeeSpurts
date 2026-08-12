@@ -23074,6 +23074,18 @@ PrefabInstance:
       value: 6
       objectReference: {fileID: 0}
     - target: {fileID: 1394686242604074747, guid: d7f57fe0970144904b48ccfccc267cdc, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 1394686242604074747, guid: d7f57fe0970144904b48ccfccc267cdc, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 1394686242604074747, guid: d7f57fe0970144904b48ccfccc267cdc, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 1394686242604074747, guid: d7f57fe0970144904b48ccfccc267cdc, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
@@ -79497,6 +79509,8 @@ MonoBehaviour:
   throwCamera: {fileID: 1271381596}
   throwReactionBehaviour: {fileID: 556551409}
   nukeResolver: {fileID: 663727178}
+  throwerAttachments: {fileID: 0}
+  carriedBallItemId: 1
   sandboxAutoStart: 0
   throwingStance: {fileID: 1560156316}
   sandboxThrower: {fileID: 920940655}

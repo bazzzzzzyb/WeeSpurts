@@ -66,11 +66,51 @@ namespace WeeSpurts.Bowling
         // fight each other.
         private Coroutine _reactionRoutine;
 
+        /// <summary>
+        /// False when we could not find an Animator that is actually driven by
+        /// a controller. Every Animator call in this class is gated on it.
+        ///
+        /// WHY: this is a purely cosmetic system, and Unity logs "Animator is
+        /// not playing an AnimatorController" on EVERY SetFloat/SetTrigger
+        /// against a controller-less Animator. SetSpeed is called from
+        /// FirstPersonController.Update, so a broken binding doesn't degrade
+        /// the reaction — it buries the console under thousands of lines a
+        /// second and makes every other error impossible to find. Failing
+        /// quiet-but-loud-once keeps the game playable and the log readable.
+        /// </summary>
+        private bool _hasController;
+
         private void Awake()
         {
             // GetComponentInChildren also checks THIS object, so it covers both
             // the wrapper-root layout the prefab uses and a bare model root.
             if (animator == null) animator = GetComponentInChildren<Animator>();
+
+            // A model swap (new character FBX behind the same prefab) can leave
+            // the prefab's controller override pointing at a component ID that
+            // no longer exists, so the Animator we just found comes back with a
+            // null controller. Before giving up, prefer any OTHER Animator in
+            // the hierarchy that IS driven — the rig we want is the animated
+            // one, whichever object happens to carry it.
+            if (animator != null && animator.runtimeAnimatorController == null)
+            {
+                foreach (Animator candidate in GetComponentsInChildren<Animator>(true))
+                {
+                    if (candidate.runtimeAnimatorController == null) continue;
+                    animator = candidate;
+                    break;
+                }
+            }
+
+            _hasController = animator != null && animator.runtimeAnimatorController != null;
+            if (animator != null && !_hasController)
+            {
+                Debug.LogWarning(
+                    $"[{nameof(CharacterThrowReactionActor)}] '{name}' found an Animator with no " +
+                    "AnimatorController, so throw reactions and the walk cycle are disabled for it. " +
+                    "Re-run WeeSpurts > 1 Assets > Set Up Player Character to rebuild the prefab binding.",
+                    this);
+            }
 
             _excitedHash = Animator.StringToHash(ExcitedTrigger);
             _defeatHash = Animator.StringToHash(DefeatTrigger);
@@ -82,7 +122,7 @@ namespace WeeSpurts.Bowling
 
         public void PlayReaction(LaunchParameters p)
         {
-            if (animator == null) return;
+            if (!_hasController) return;
 
             // Reset all four triggers before setting one. A trigger that was
             // set but never consumed (e.g. two throws resolved back to back,
@@ -118,7 +158,7 @@ namespace WeeSpurts.Bowling
         /// </summary>
         public void PlayThrow()
         {
-            if (animator != null) animator.SetTrigger(_throwHash);
+            if (_hasController) animator.SetTrigger(_throwHash);
         }
 
         /// <summary>
@@ -178,7 +218,7 @@ namespace WeeSpurts.Bowling
         /// </summary>
         public void SetDrunk(bool drunk)
         {
-            if (animator != null) animator.SetBool(_drunkHash, drunk);
+            if (_hasController) animator.SetBool(_drunkHash, drunk);
         }
 
         /// <summary>
@@ -187,7 +227,7 @@ namespace WeeSpurts.Bowling
         /// </summary>
         public void SetSpeed(float speed)
         {
-            if (animator != null) animator.SetFloat(_speedHash, speed);
+            if (_hasController) animator.SetFloat(_speedHash, speed);
         }
     }
 }

@@ -49,7 +49,7 @@ clips nobody intended:
 
 So: your idle is a nod, your defeat and your drunk idle are the identical headache animation, and your
 throw is someone crouching to pick something off the floor. That is the entire mystery. **Re-running
-`WeeSpurts > Set Up Player Character` would fix half of it in thirty seconds** — but don't, because
+`WeeSpurts > 1 Assets > Set Up Player Character` would fix half of it in thirty seconds** — but don't, because
 Block 2 rewrites that tool anyway.
 
 ### The gooey arms — this one is not a code bug
@@ -266,7 +266,7 @@ needing a manual step from you, so read the "if it fails" note before you begin.
 > **No tests.** This is verified by me pressing Play. Do not write EditMode tests for importer settings
 > beyond the existing `CharacterSetupToolTests` guards.
 
-**Gate:** run `WeeSpurts > Set Up Player Character`, enter Play, and walk around. You are looking for
+**Gate:** run `WeeSpurts > 1 Assets > Set Up Player Character`, enter Play, and walk around. You are looking for
 **arms that swing independently of the torso**. Also fire a throw and watch which clip plays.
 
 **If the auto-avatar fails:** Unity's automatic bone mapping regularly fails on auto-generated

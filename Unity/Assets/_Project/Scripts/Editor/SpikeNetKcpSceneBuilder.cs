@@ -24,7 +24,7 @@ namespace WeeSpurts.Editor
     /// is not a discovered "correct" default). No bowling, no interaction, no
     /// venue geometry — those stay out of this spike's one question.
     ///
-    /// Menu: WeeSpurts/Spike/Build Net KCP Scene
+    /// Menu: WeeSpurts/Debug/Build Net KCP Spike Scene
     /// </summary>
     public static class SpikeNetKcpSceneBuilder
     {
@@ -33,7 +33,7 @@ namespace WeeSpurts.Editor
         private const string RoamConfigPath = ProjectRoot + "/ScriptableObjects/RoamConfig.asset";
         private const string PlayerPrefabPath = ProjectRoot + "/Prefabs/SpikeNetKcpPlayer.prefab";
 
-        [MenuItem("WeeSpurts/Spike/Build Net KCP Scene")]
+        [MenuItem("WeeSpurts/Debug/Build Net KCP Spike Scene")]
         public static void Build()
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);

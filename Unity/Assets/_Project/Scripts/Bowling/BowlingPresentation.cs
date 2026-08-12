@@ -40,6 +40,12 @@ namespace WeeSpurts.Bowling
         [Tooltip("Optional. Presentation layer for the Nuke Shot powerup. Leave empty in scenes that don't have one yet — a Nuke BallConfig just won't resolve until this is wired.")]
         [SerializeField] private NukeShotResolver nukeResolver;
 
+        [Tooltip("Optional. The thrower's AttachmentSlots (on the PlayerCharacter prefab root) — used to put a bowling ball in his hand while he aims. Leave empty to skip; the ball simply won't appear in-hand.")]
+        [SerializeField] private WeeSpurts.Characters.AttachmentSlots throwerAttachments;
+
+        [Tooltip("Which AttachmentCatalog id is the carried bowling ball. Must match the id PropSetupTool assigns (1 by default). An INT rather than a direct reference because that's how every other item id in this project crosses a system boundary — and because PropSetupTool is Editor-only, so a shared constant isn't reachable from here.")]
+        [SerializeField] private int carriedBallItemId = 1;
+
         [Header("Match start (control modes)")]
         [Tooltip("SANDBOX FEEL-TESTING PATH: start the match the instant the scene loads, so you can throw immediately without walking to a lane kiosk first. DEFAULT TRUE so every existing scene behaves exactly as it did before roaming existed. RoamingSetupTool switches it OFF in the walkable venue scene, where the match is meant to start diegetically.")]
         [SerializeField] private bool sandboxAutoStart = true;
@@ -129,6 +135,9 @@ namespace WeeSpurts.Bowling
         /// <summary>Wires the optional Nuke Shot presentation layer (same pattern as SetThrowReactionActor).</summary>
         public void SetNukeResolver(NukeShotResolver resolver) => nukeResolver = resolver;
 
+        /// <summary>Wires the thrower's attachment slots, so the carried ball can appear in his hand (same pattern as SetThrowReactionActor).</summary>
+        public void SetThrowerAttachments(WeeSpurts.Characters.AttachmentSlots slots) => throwerAttachments = slots;
+
         private void Start()
         {
             // Unity can't serialize an interface field directly, so
@@ -136,6 +145,17 @@ namespace WeeSpurts.Bowling
             // cast here. "as" on a null reference just yields null, so an
             // unassigned slot safely resolves to no-op via the ?. below.
             _throwReaction = throwReactionBehaviour as IThrowReactionActor;
+
+            // SELF-WIRING, so an EXISTING scene doesn't have to be rebuilt by a
+            // setup tool just to gain the carried ball. The thrower's
+            // AttachmentSlots lives on the same GameObject as its reaction
+            // actor (CharacterSetupTool puts both on the PlayerCharacter
+            // prefab root), so if nobody assigned the field explicitly we can
+            // simply go and look. The scene tools still call
+            // SetThrowerAttachments — this is the fallback, not a replacement,
+            // and an explicitly-wired reference always wins.
+            if (throwerAttachments == null && throwReactionBehaviour != null)
+                throwerAttachments = throwReactionBehaviour.GetComponent<WeeSpurts.Characters.AttachmentSlots>();
 
             _matchFlow.Initialize();
 
@@ -249,14 +269,38 @@ namespace WeeSpurts.Bowling
         public void SnapCameraToAimView() => throwCamera.SnapToAimView();
 
         /// <summary>
-        /// The ball has just left the hand: play the thrower's Body English and
-        /// hand the camera the ball. Both are cosmetic and both must happen the
-        /// instant of release, not after the pins are counted — hence one call
-        /// in this order rather than two separate hooks match flow could get out
-        /// of order.
+        /// An aim phase has opened: put a bowling ball in the thrower's hand.
+        ///
+        /// Docs/CharacterPipeline.md §3 Layer 3's worked example, and the reason
+        /// AttachmentSlots was built the way it was — the carried ball is a
+        /// RightHand ATTACHMENT, deliberately the same mechanism as a hat, not a
+        /// parallel one. Purely cosmetic: this is the visual stand-in the player
+        /// holds while aiming, NOT the physical BowlingBall that gets launched
+        /// (that one is spawned by match flow and owns all the physics).
+        ///
+        /// No-ops via ?. in scenes with no attachments wired, exactly like the
+        /// reaction actor and the nuke resolver above.
+        /// </summary>
+        public void OnAimStarted()
+        {
+            throwerAttachments?.Equip(WeeSpurts.Characters.AttachmentSlot.RightHand, carriedBallItemId);
+        }
+
+        /// <summary>
+        /// The ball has just left the hand: take the carried ball OUT of that
+        /// hand, play the thrower's Body English and hand the camera the ball.
+        /// All three are cosmetic and all three must happen the instant of
+        /// release, not after the pins are counted — hence one call in this
+        /// order rather than three separate hooks match flow could get out of
+        /// order.
+        ///
+        /// The unequip is FIRST for a reason: the real ball becomes visible on
+        /// this same frame, and leaving the carried one in-hand for even a frame
+        /// longer reads as the thrower cloning it.
         /// </summary>
         public void OnThrowLaunched(LaunchParameters p)
         {
+            throwerAttachments?.Unequip(WeeSpurts.Characters.AttachmentSlot.RightHand);
             _throwReaction?.PlayReaction(p);
             throwCamera.FollowBall();
         }

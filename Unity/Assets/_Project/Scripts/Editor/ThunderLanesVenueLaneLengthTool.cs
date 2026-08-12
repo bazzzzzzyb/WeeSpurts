@@ -73,7 +73,7 @@ namespace WeeSpurts.Editor
             "Lane_Bed_", "Gutter_Left_", "Gutter_Right_", "Lane_Neon_Accent"
         };
 
-        [MenuItem("WeeSpurts/Thunder Lanes Venue/Extend Lane Bank (+8.8m)")]
+        [MenuItem("WeeSpurts/4 Thunder Lanes Venue/Extend Lane Bank (+8.8m)")]
         public static void ExtendLaneBank()
         {
             if (GameObject.Find("OuterWall_East_LaneBank") != null)

@@ -127,6 +127,42 @@ namespace WeeSpurts.Bowling
         /// <summary>Where a fresh roll starts. Exposed for the sandbox aim preview.</summary>
         public Transform BallSpawn => ballSpawn;
 
+        /// <summary>
+        /// Where the ball and its aim marker ACTUALLY start.
+        ///
+        /// The authored BallSpawn transform decides the lane position (how far
+        /// down the lane, and the lateral centre). Its HEIGHT is re-derived here
+        /// from <see cref="BallConfig.SpawnHeight"/> every time this is read.
+        ///
+        /// WHY: the scene builders bake SpawnHeight into that transform at build
+        /// time, so in an already-built scene, retuning the config did nothing —
+        /// the ball kept spawning at whatever height the scene was built with,
+        /// and its tooltip ("Height the ball starts at") was simply untrue there.
+        /// Deriving it live makes the config genuinely authoritative: the ball
+        /// and marker move by editing one number, with no scene rebuild and no
+        /// hand-editing of scene files.
+        ///
+        /// Lateral is deliberately NOT touched — the authored transform is
+        /// already lane-centre, which is where the marker belongs.
+        /// </summary>
+        public Vector3 BallSpawnPosition
+        {
+            get
+            {
+                if (ballSpawn == null) return Vector3.zero;
+
+                Vector3 p = ballSpawn.position;
+                if (ballConfig == null) return p;
+
+                // PointAt(downLane, lateral, height) with height 0 is the lane
+                // SURFACE, so this works whether the lane sits at world Y=0
+                // (greybox) or on a raised venue floor.
+                float surfaceY = lane != null ? lane.PointAt(0f, 0f, 0f).y : 0f;
+                p.y = surfaceY + ballConfig.SpawnHeight;
+                return p;
+            }
+        }
+
         /// <summary>This lane's own axes, if wired — see LaneFrame's class comment. May be null.</summary>
         public LaneFrame Lane => lane;
 
@@ -346,7 +382,7 @@ namespace WeeSpurts.Bowling
                 pinDeck.ClearDeadWood(); // leave standing pins, remove fallen ones
 
             pinDeck.MarkRollStart();
-            ball.ResetForThrow(ballSpawn.position);
+            ball.ResetForThrow(BallSpawnPosition);
             _presentation.SnapCameraToAimView();
 
             ApplyGreenZoneForActiveBall();
@@ -371,6 +407,13 @@ namespace WeeSpurts.Bowling
             _lastAimTurnPlayer = current;
 
             launcher.BeginAim(newTurn ? _presentation.SteeringLockSecondsForNewTurn : 0f);
+
+            // Cosmetic only, and paired with the unequip inside
+            // OnThrowLaunched: put the carried ball in the thrower's hand for
+            // the duration of the aim. Told to presentation rather than done
+            // here, same as every other "what should be SHOWN" decision in this
+            // class — match flow holds no character, no camera and no catalog.
+            _presentation.OnAimStarted();
 
             Phase = $"{Turns.CurrentPlayer.DisplayName} — frame {scorer.CurrentFrame + 1}, roll {scorer.RollInFrame + 1}: AIM";
         }
@@ -440,7 +483,7 @@ namespace WeeSpurts.Bowling
             }
 
             // Place the ball at the chosen lateral spot, then hand physics the wheel.
-            Vector3 start = ballSpawn.position + LaneRight * (p.LateralPosition01 * HalfLaneWidth);
+            Vector3 start = BallSpawnPosition + LaneRight * (p.LateralPosition01 * HalfLaneWidth);
             ball.ResetForThrow(start);
 
             _ballSettled = false;
@@ -551,7 +594,7 @@ namespace WeeSpurts.Bowling
         private IEnumerator ResolveNukeThrow(LaunchParameters p)
         {
             bool isGreen = p.IsGreen;
-            Vector3 spawnPos = ballSpawn.position + LaneRight * (p.LateralPosition01 * HalfLaneWidth);
+            Vector3 spawnPos = BallSpawnPosition + LaneRight * (p.LateralPosition01 * HalfLaneWidth);
             int knocked;
 
             if (isGreen)

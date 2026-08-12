@@ -59,7 +59,7 @@ namespace WeeSpurts.Bowling
 
             // Same formula ResolveThrow uses to place the ball at throw
             // time, so the preview position IS where it will actually launch from.
-            Vector3 basePos = game.BallSpawn.position;
+            Vector3 basePos = game.BallSpawnPosition;
             transform.position = basePos + LaneRight * (launcher.CurrentLateral * game.HalfLaneWidth);
 
             DrawAimLine();

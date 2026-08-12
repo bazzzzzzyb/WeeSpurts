@@ -13,8 +13,8 @@ namespace WeeSpurts.Editor
     /// Builds the VENUE around the bowling lanes as flat greybox boxes.
     ///
     /// Menu:
-    ///   WeeSpurts -> Build Alley Venue Greybox (Standalone Scene)   [look first]
-    ///   WeeSpurts -> Build Alley Venue Greybox                      [current scene]
+    ///   WeeSpurts -> 2 Build New Scene -> Alley Venue Greybox   [look first]
+    ///   WeeSpurts -> 3 Modify Open Scene -> Add Alley Venue Greybox                      [current scene]
     ///
     /// LAYOUT v2 — A BANDED, WALKABLE SOCIAL FLOOR. v1 was a room with props round
     /// the edges. v2 is a stack of Z bands you walk through, west to east:
@@ -93,7 +93,7 @@ namespace WeeSpurts.Editor
 
         // ------------------------------------------------------------ menu items
 
-        [MenuItem("WeeSpurts/Build Alley Venue Greybox (Standalone Scene)")]
+        [MenuItem("WeeSpurts/2 Build New Scene/Alley Venue Greybox")]
         public static void BuildStandaloneScene()
         {
             // Same guard as GreyboxSceneBuilder: NewScene below replaces whatever
@@ -141,7 +141,7 @@ namespace WeeSpurts.Editor
                       ". This scene is set dressing only — no lane, pins or ball logic.");
         }
 
-        [MenuItem("WeeSpurts/Build Alley Venue Greybox")]
+        [MenuItem("WeeSpurts/3 Modify Open Scene/Add Alley Venue Greybox")]
         public static void BuildIntoCurrentScene()
         {
             Scene scene = SceneManager.GetActiveScene();

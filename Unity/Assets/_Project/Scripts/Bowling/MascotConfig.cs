@@ -20,7 +20,7 @@ namespace WeeSpurts.Bowling
         [Range(0f, 1f)]
         public float Opacity = 0.6f;
 
-        [Tooltip("Uniform scale applied to the PlayerCharacter prefab root. Change this and re-run WeeSpurts > Set Up Player Character to resize — the console logs the resulting height each time (target ~1.7-1.8 m for an adult).")]
+        [Tooltip("Uniform scale applied to the PlayerCharacter prefab root. Change this and re-run WeeSpurts > 1 Assets > Set Up Player Character to resize — the console logs the resulting height each time (target ~1.7-1.8 m for an adult).")]
         public float DisplayScale = 0.56f;
     }
 }
