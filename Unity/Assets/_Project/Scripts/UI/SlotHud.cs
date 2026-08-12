@@ -2,6 +2,7 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using WeeSpurts.Core;
 using WeeSpurts.Slop;
 
 namespace WeeSpurts.UI
@@ -67,11 +68,12 @@ namespace WeeSpurts.UI
 
         private bool _wasVisible;
         private bool _flickering;
+        private bool _wasInBonus;
 
         private void Awake()
         {
             if (pullButton != null) pullButton.onClick.AddListener(OnPullClicked);
-            if (leaveButton != null) leaveButton.onClick.AddListener(() => station.Leave());
+            if (leaveButton != null) leaveButton.onClick.AddListener(() => { AudioManager.Instance?.PlaySfx(SoundId.UiClick); station.Leave(); });
             if (betSlider != null) betSlider.onValueChanged.AddListener(OnBetSliderChanged);
         }
 
@@ -87,10 +89,16 @@ namespace WeeSpurts.UI
             SlotMachine machine = station.Machine;
             bool inBonus = machine.BonusPullsRemaining > 0;
 
-            // FREE FRAME is meant to read as an event (exec-day plan: "the
-            // whole alley hears it"), so the bonus banner and a locked bet
-            // slider are the on-screen half of that — the audio-venue-wide
-            // half is future work (AudioManager has no clip catalog yet).
+            // FREE FRAME reads as an event (exec-day plan: "the whole alley
+            // hears it") — PlaySfx, not PlaySfxAt, is deliberate: non-
+            // positional means every player in the venue hears it, not just
+            // whoever's sitting here. Fires once on the false->true edge, not
+            // every frame the banner is up, and a retrigger mid-bonus (more
+            // free pulls stacked on top) does NOT re-fire it — only the
+            // initial trigger is the "event."
+            if (inBonus && !_wasInBonus) AudioManager.Instance?.PlaySfx(SoundId.SlotJackpot);
+            _wasInBonus = inBonus;
+
             if (bonusBanner != null) bonusBanner.SetActive(inBonus);
             if (bonusText != null && inBonus)
                 bonusText.text = $"FREE FRAME!  {machine.BonusPullsRemaining} pulls left   x{machine.BonusMultiplier}";
@@ -151,6 +159,7 @@ namespace WeeSpurts.UI
             SetReelSymbol(0, pull.Reel0);
             SetReelSymbol(1, pull.Reel1);
             SetReelSymbol(2, pull.Reel2);
+            AudioManager.Instance?.PlaySfxAt(SoundId.SlotReelStop, station.transform.position);
 
             if (resultText != null)
                 resultText.text = !pull.Spun ? "—" : (pull.Returned > 0 ? $"+{pull.Returned}!" : "nothing");

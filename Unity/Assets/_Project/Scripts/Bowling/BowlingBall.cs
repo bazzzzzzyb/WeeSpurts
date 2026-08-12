@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using WeeSpurts.Core;
 
 namespace WeeSpurts.Bowling
 {
@@ -24,13 +25,19 @@ namespace WeeSpurts.Bowling
         [Tooltip("Optional. Defines this lane's own down-lane/lateral axes. Leave empty for the default world Z/X axes — every lane GreyboxSceneBuilder generates.")]
         [SerializeField] private LaneFrame lane;
 
+        [Tooltip("Cosmetic only, for the gutter-thunk sound cue — how far off the lane's centreline (either side) counts as 'in the gutter'. Does not affect physics or scoring. Defaults to LaneConfig's own default half-width (1.4m lane / 2).")]
+        [SerializeField] private float gutterHalfWidth = 0.7f;
+
         private Rigidbody _rb;
         private Collider _collider;
         private Renderer _renderer;
+        private AudioSource _rollSource; // dedicated, not pooled — needs to loop and follow the ball for the whole throw
         private BallConfig _config;
         private bool _inFlight;
         private float _throwStartTime;
         private float _slowSince = -1f;
+        private int _throwSeed;         // LaunchParameters.Seed, kept for the gutter cue's seeded variation pick
+        private bool _gutterSoundPlayed;
         private Vector2 _spin;      // player-dialled 2D spin (see SpinModel)
         private float _launchDist;  // down-lane origin for the spin ramp, captured at release
         private Vector3 _launchDir; // stored so topspin's forward drive can't feed back on itself
@@ -41,6 +48,8 @@ namespace WeeSpurts.Bowling
         private Vector3 LaneRight => lane != null ? lane.Right : Vector3.right;
         private float DistanceDownLane(Vector3 worldPosition) =>
             lane != null ? lane.DistanceAlong(worldPosition) : worldPosition.z;
+        private float LateralOffset(Vector3 worldPosition) =>
+            lane != null ? lane.LateralOf(worldPosition) : worldPosition.x;
         private float _hookForce; // precomputed sign+magnitude Hook force, set once in Launch()
         private float _wobblePhase; // radians, seeded per-throw so the weave differs per Seed
         private float _wobbleElapsed; // seconds, accumulated from Time.fixedDeltaTime (NOT Time.time — see FixedUpdate)
@@ -109,6 +118,15 @@ namespace WeeSpurts.Bowling
             // rotation. Raised per-rigidbody rather than in Project Settings so
             // it cannot affect the pins or anything else in the scene.
             _rb.maxAngularVelocity = MAX_ANGULAR_VELOCITY;
+
+            // Not [RequireComponent] — the ball prefab never carried one, and
+            // adding it here means no prefab edit is needed for the roll loop
+            // to work. Loops for the whole flight; Launch() assigns the clip
+            // and starts it, OnSettled's handler stops it.
+            _rollSource = gameObject.AddComponent<AudioSource>();
+            _rollSource.loop = true;
+            _rollSource.playOnAwake = false;
+            _rollSource.spatialBlend = 1f;
         }
 
         /// <summary>
@@ -151,6 +169,22 @@ namespace WeeSpurts.Bowling
             // GreyboxSceneBuilder only bakes bounciness onto the collider once,
             // at scene-build time, from whatever config was default then.
             _collider.material.bounciness = config.Bounciness;
+
+            // Audio: identical for both branches below, so it happens once
+            // here rather than being duplicated into the fumble branch.
+            // Seeded off the throw's own Seed (not live Random) because this
+            // IS the throw — same reasoning this class already applies to
+            // the wobble/cone jitter below, just extended to the sound
+            // that goes with them.
+            _throwSeed = p.Seed;
+            _gutterSoundPlayed = false;
+            AudioManager.Instance?.PlaySfxAtSeeded(SoundId.BallLaneImpact, transform.position, p.Seed);
+            AudioClip rollClip = AudioManager.Instance != null ? AudioManager.Instance.GetClip(SoundId.BallRoll) : null;
+            if (rollClip != null)
+            {
+                _rollSource.clip = rollClip;
+                _rollSource.Play();
+            }
 
             if (p.IsBackwardFumble)
             {
@@ -295,6 +329,17 @@ namespace WeeSpurts.Bowling
                 _rb.AddForce(LaneRight * wobble, ForceMode.Force);
             }
 
+            // Gutter thunk: fires once, the moment the ball first strays past
+            // gutterHalfWidth off the lane's centreline. Cosmetic-only read of
+            // the same lateral math the lane already uses for aim/hook — this
+            // does not touch physics, so a wrong gutterHalfWidth can only ever
+            // make the cue play at the wrong moment, never change the roll.
+            if (!_gutterSoundPlayed && Mathf.Abs(LateralOffset(transform.position)) > gutterHalfWidth)
+            {
+                _gutterSoundPlayed = true;
+                AudioManager.Instance?.PlaySfxAtSeeded(SoundId.BallGutter, transform.position, _throwSeed);
+            }
+
             // Settled = slow for long enough, or timed out entirely.
             bool timedOut = Time.time - _throwStartTime > _config.ThrowTimeout;
             bool slow = BallVelocity.magnitude < _config.SettleSpeed;
@@ -311,6 +356,7 @@ namespace WeeSpurts.Bowling
             {
                 _inFlight = false;
                 _rb.isKinematic = true; // stop it twitching while pins are counted
+                _rollSource.Stop();
                 OnSettled?.Invoke();
             }
         }

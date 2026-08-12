@@ -73,6 +73,17 @@ namespace WeeSpurts.Core
             // create a second ledger, briefly, and any listener that grabbed it
             // in the same frame would be writing tickets into an orphan.
             Tickets = new TicketLedger();
+
+            // The ledger's own class comment calls this "everyone's" listener
+            // (the ticket-feed HUD, an audio cue, later a ClientRpc) — this is
+            // that audio cue, hooked once at the ledger's single choke point
+            // rather than scattered across every vendor/station call site.
+            // Delta > 0 is an award (a purchase's Delta is negative), which is
+            // the only half of "dispense" tickets actually leave the machine.
+            Tickets.OnTransaction += transaction =>
+            {
+                if (transaction.Delta > 0) AudioManager.Instance?.PlaySfx(SoundId.TicketDispense);
+            };
         }
 
         /// <summary>

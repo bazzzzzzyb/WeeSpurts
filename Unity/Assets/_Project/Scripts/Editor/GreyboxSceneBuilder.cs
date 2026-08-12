@@ -323,7 +323,8 @@ namespace WeeSpurts.Editor
             GameObject managers = new GameObject("GameManager");
             managers.AddComponent<GameManager>();
             managers.AddComponent<SceneLoader>();
-            managers.AddComponent<AudioManager>();
+            AudioManager audioManager = managers.AddComponent<AudioManager>();
+            WireAudioCatalog(audioManager);
 
             // The bowling game is TWO components on one object: BowlingMatchFlow
             // (authoritative match state — turns, pins, scores) and
@@ -607,6 +608,27 @@ namespace WeeSpurts.Editor
             EnsureFolder(ProjectRoot + "/Materials");
             AssetDatabase.CreateAsset(mat, path);
             return mat;
+        }
+
+        /// <summary>
+        /// Loads (or creates) the one shared AudioCatalog asset, seeds it with
+        /// every id in SoundId.All (additive-only — never touches a row a
+        /// Tony hand-edit already filled in), and wires it onto the given
+        /// AudioManager if it isn't wired already. Same idempotent "only-if-
+        /// null" discipline as EconomyConfig's wiring elsewhere in this file.
+        /// </summary>
+        private static void WireAudioCatalog(AudioManager audioManager)
+        {
+            AudioCatalog catalog = LoadOrCreateAsset<AudioCatalog>(ProjectRoot + "/ScriptableObjects/AudioCatalog.asset");
+            catalog.EnsureIds(SoundId.All);
+            EditorUtility.SetDirty(catalog);
+
+            var so = new SerializedObject(audioManager);
+            SerializedProperty catalogProperty = so.FindProperty("catalog");
+            if (catalogProperty != null && catalogProperty.objectReferenceValue == null)
+                catalogProperty.objectReferenceValue = catalog;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(audioManager);
         }
 
         private static T LoadOrCreateAsset<T>(string path) where T : ScriptableObject

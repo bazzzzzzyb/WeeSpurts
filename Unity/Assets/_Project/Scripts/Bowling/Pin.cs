@@ -1,4 +1,5 @@
 using UnityEngine;
+using WeeSpurts.Core;
 
 namespace WeeSpurts.Bowling
 {
@@ -183,6 +184,22 @@ namespace WeeSpurts.Bowling
         public void ApplyExplosion(Vector3 origin, float radius, float force)
         {
             _rb.AddExplosionForce(force, origin, radius, upwardsModifier: 0.3f, mode: ForceMode.Impulse);
+        }
+
+        /// <summary>Below this relative speed (m/s), a contact is a pins-resettling nudge, not a crash worth hearing.</summary>
+        private const float MinImpactSpeedForSound = 1.5f;
+
+        /// <summary>
+        /// Plain UnityEngine.Random for the variation pick, not a seeded RNG:
+        /// a pin crash sounding different on two machines is fine — nothing
+        /// downstream reads which take played, unlike a card or a payout.
+        /// Same rule Block 1's SlotMachine/DrinkMeter work applied to
+        /// non-throw-driven randomness.
+        /// </summary>
+        private void OnCollisionEnter(Collision collision)
+        {
+            if (collision.relativeVelocity.magnitude < MinImpactSpeedForSound) return;
+            AudioManager.Instance?.PlaySfxAt(SoundId.PinCrash, transform.position);
         }
     }
 }

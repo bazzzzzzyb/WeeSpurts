@@ -51,6 +51,7 @@ namespace WeeSpurts.Editor
         private const string BlackjackConfigPath = ProjectRoot + "/ScriptableObjects/CasinoBlackjackConfig.asset";
         private const string SlotConfigPath = ProjectRoot + "/ScriptableObjects/CasinoSlotConfig.asset";
         private const string EconomyConfigPath = ProjectRoot + "/ScriptableObjects/EconomyConfig.asset";
+        private const string AudioCatalogPath = ProjectRoot + "/ScriptableObjects/AudioCatalog.asset";
 
         // Interaction anchors sit a little above the measured floor — roughly
         // hip/counter height — so PlayerInteractor's cone (measured from the
@@ -110,6 +111,14 @@ namespace WeeSpurts.Editor
                 managers.AddComponent<SceneLoader>();
                 managers.AddComponent<AudioManager>();
             }
+
+            // Runs whether GameManager was just created above or already
+            // existed (e.g. a scene built by GreyboxSceneBuilder before this
+            // tool ever touched it) — GetOrAdd rather than assuming AudioManager
+            // is already there, and wiring is idempotent, so reruns never
+            // duplicate or overwrite a Tony hand-edit.
+            AudioManager audioManager = GetOrAdd<AudioManager>(gameManager.gameObject);
+            WireAudioCatalog(audioManager);
 
             EconomyConfig economyConfig = LoadOrCreateAsset<EconomyConfig>(EconomyConfigPath);
             var gameManagerSo = new SerializedObject(gameManager);
@@ -1069,6 +1078,27 @@ namespace WeeSpurts.Editor
                 return;
             }
             property.objectReferenceValue = value;
+        }
+
+        /// <summary>
+        /// Loads (or creates) the one shared AudioCatalog asset, seeds it with
+        /// every id in SoundId.All (additive-only — never touches a row a
+        /// Tony hand-edit already filled in), and wires it onto the given
+        /// AudioManager if it isn't wired already. Same idempotent "only-if-
+        /// null" discipline as economyConfig's wiring above.
+        /// </summary>
+        private static void WireAudioCatalog(AudioManager audioManager)
+        {
+            AudioCatalog catalog = LoadOrCreateAsset<AudioCatalog>(AudioCatalogPath);
+            catalog.EnsureIds(SoundId.All);
+            EditorUtility.SetDirty(catalog);
+
+            var so = new SerializedObject(audioManager);
+            SerializedProperty catalogProperty = so.FindProperty("catalog");
+            if (catalogProperty != null && catalogProperty.objectReferenceValue == null)
+                catalogProperty.objectReferenceValue = catalog;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(audioManager);
         }
 
         private static T LoadOrCreateAsset<T>(string path) where T : ScriptableObject

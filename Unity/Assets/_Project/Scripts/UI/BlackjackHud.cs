@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using WeeSpurts.Core;
 using WeeSpurts.Slop;
 
 namespace WeeSpurts.UI
@@ -94,14 +95,16 @@ namespace WeeSpurts.UI
 
         private void Awake()
         {
-            if (dealButton != null) dealButton.onClick.AddListener(() => station.Deal());
-            if (hitButton != null) hitButton.onClick.AddListener(() => station.Hit());
-            if (standButton != null) standButton.onClick.AddListener(() => station.Stand());
-            if (doubleButton != null) doubleButton.onClick.AddListener(() => station.Double());
-            if (splitButton != null) splitButton.onClick.AddListener(() => station.Split());
-            if (leaveButton != null) leaveButton.onClick.AddListener(() => station.Leave());
+            if (dealButton != null) dealButton.onClick.AddListener(() => { Click(); station.Deal(); });
+            if (hitButton != null) hitButton.onClick.AddListener(() => { Click(); station.Hit(); });
+            if (standButton != null) standButton.onClick.AddListener(() => { Click(); station.Stand(); });
+            if (doubleButton != null) doubleButton.onClick.AddListener(() => { Click(); station.Double(); });
+            if (splitButton != null) splitButton.onClick.AddListener(() => { Click(); station.Split(); });
+            if (leaveButton != null) leaveButton.onClick.AddListener(() => { Click(); station.Leave(); });
             if (betSlider != null) betSlider.onValueChanged.AddListener(OnBetSliderChanged);
         }
+
+        private static void Click() => AudioManager.Instance?.PlaySfx(SoundId.UiClick);
 
         private void Update()
         {

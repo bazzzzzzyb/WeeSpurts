@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using WeeSpurts.Core;
 using WeeSpurts.Player;
 
 namespace WeeSpurts.Interaction
@@ -184,6 +185,7 @@ namespace WeeSpurts.Interaction
 
             if (Current != null && Input.GetKeyDown(config.InteractKey))
             {
+                AudioManager.Instance?.PlaySfx(SoundId.UiClick);
                 // The local player ASKS. See IInteractable.Interact — when
                 // Mirror lands this call becomes a [Command] and the host
                 // re-validates before acting.
