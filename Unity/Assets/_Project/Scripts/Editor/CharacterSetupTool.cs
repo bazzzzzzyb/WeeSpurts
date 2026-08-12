@@ -313,16 +313,16 @@ namespace WeeSpurts.Editor
         /// a clip source. Crawl_Backward has no entry here on purpose — Tony's
         /// call, it's unused, and its import is left untouched entirely.
         ///
-        /// KNOWN WRONG, LEFT WRONG ON PURPOSE (2026-08-11): DrunkIdle and
-        /// Defeat below are two clips carved from the SAME Headache_Relief
-        /// take, so the thrower rubs his temples both when he is drunk and
-        /// when he loses. Meshy shipped no slump and no sway, so there is
-        /// nothing here to point them at — the fix needs the Mixamo clips,
-        /// and lands with the clip-table pass that adds SitIdle, StandToSit
-        /// and Stumble. Deliberately NOT patched with a Meshy substitute in
-        /// the meantime: swapping in a merely-different gesture would hide the
-        /// symptom without fixing it. The rig conversion this session is about
-        /// is what unblocks the real fix.
+        /// STILL HERE, NO LONGER USED FOR DrunkIdle/Defeat AT RUNTIME
+        /// (2026-08-11, later): the two rows below remain the SAME
+        /// Headache_Relief take, on purpose — they are the fallback
+        /// AddStatePreferMixamo uses when Tony's Mixamo "drunk idle"/"Defeat"
+        /// downloads AREN'T on disk (a fresh clone, or before he's grabbed
+        /// them). Once those two files exist in Animations/Mixamo/ — they do,
+        /// as of this session — SetUp's state-building step prefers them and
+        /// this table's Headache_Relief rows go unused. Left in rather than
+        /// deleted so the controller still builds something sane without the
+        /// Mixamo folder at all.
         /// </summary>
         private static readonly (string SourceFile, string ClipName, bool Loop)[] Clips =
         {
@@ -341,6 +341,15 @@ namespace WeeSpurts.Editor
 
         /// <summary>Builds a full asset path from just a Meshy &lt;Name&gt; token (see MascotFilePrefix/Suffix doc above).</summary>
         private static string MascotClipPath(string sourceFile) => MascotFolder + "/" + MascotFilePrefix + sourceFile + MascotFileSuffix;
+
+        /// <summary>
+        /// Builds a full asset path from a Mixamo download's filename (no
+        /// extension). ImportMixamoClips names the imported clip after the
+        /// FILE (see its own doc comment), so the clip inside always shares
+        /// this same name — unlike MascotClipPath there is no separate
+        /// prefix/suffix to strip, Tony's own filename IS the path fragment.
+        /// </summary>
+        private static string MixamoClipPath(string fileName) => MixamoFolder + "/" + fileName + ".fbx";
 
         [MenuItem("WeeSpurts/1 Assets/Set Up Player Character")]
         public static void SetUp()
@@ -665,18 +674,66 @@ namespace WeeSpurts.Editor
 
             AnimatorStateMachine sm = controller.layers[0].stateMachine;
 
-            AnimatorState idle = AddState(sm, "Idle", MascotClipPath("Idle_3"), "Idle", new Vector3(300f, 0f, 0f));
-            AnimatorState walking = AddState(sm, "Walking", MascotClipPath("Walking"), "Walking", new Vector3(300f, 100f, 0f));
-            AnimatorState sprint = AddState(sm, "Sprint", MascotClipPath("Running"), "Running", new Vector3(300f, 200f, 0f));
-            AnimatorState drunkIdle = AddState(sm, "DrunkIdle", MascotClipPath("Headache_Relief"), "DrunkIdle", new Vector3(300f, -100f, 0f));
-            AnimatorState drunkWalk = AddState(sm, "DrunkWalk", MascotClipPath("Funky_Walk"), "DrunkWalk", new Vector3(300f, -200f, 0f));
-            AnimatorState excited = AddState(sm, "Excited", MascotClipPath("happy_jump_m"), "Excited", new Vector3(600f, -60f, 0f));
-            // Defeat's clip source changed: it now comes from Headache_Relief
-            // (see Clips above) instead of the old Mixamo "Defeat" FBX — same
-            // state name and trigger, new source file.
-            AnimatorState defeat = AddState(sm, "Defeat", MascotClipPath("Headache_Relief"), "Defeat", new Vector3(600f, 40f, 0f));
-            AnimatorState fallFlat = AddState(sm, "FallFlat", MascotClipPath("Fall_Down"), "FallFlat", new Vector3(600f, 140f, 0f));
-            AnimatorState throwState = AddState(sm, "Throw", MascotClipPath("Female_Crouch_Pick_Throw_Forward"), "Throw", new Vector3(600f, 240f, 0f));
+            // Every locomotion/expression state now PREFERS the matching Mixamo
+            // download when Tony has actually grabbed it, and falls back to the
+            // Meshy take otherwise — see AddStatePreferMixamo. This is what
+            // finally splits DrunkIdle and Defeat (both used to be carved from
+            // the SAME Headache_Relief take, see the Clips table comment) now
+            // that real "drunk idle" and "Defeat" clips exist. Sprint, FallFlat
+            // and Throw have no Mixamo replacement in today's download batch
+            // (no forward run, no fall, nothing that reads as a bowling
+            // delivery) so they keep their Meshy clip unconditionally.
+            // "Breathing Idle" was one of the downloads that turned out to
+            // import with zero usable clips (see MixamoClipExists' doc
+            // comment) — "Neutral Idle" is Tony's replacement grab, not a
+            // renamed version of the same file.
+            AnimatorState idle = AddStatePreferMixamo(sm, "Idle", "Neutral Idle", "Idle_3", "Idle", new Vector3(300f, 0f, 0f));
+            AnimatorState walking = AddStatePreferMixamo(sm, "Walking", "Walking", "Walking", "Walking", new Vector3(300f, 100f, 0f));
+            AnimatorState sprint = AddStatePreferMixamo(sm, "Sprint", null, "Running", "Running", new Vector3(300f, 200f, 0f));
+            AnimatorState drunkIdle = AddStatePreferMixamo(sm, "DrunkIdle", "drunk idle", "Headache_Relief", "DrunkIdle", new Vector3(300f, -100f, 0f));
+            AnimatorState drunkWalk = AddStatePreferMixamo(sm, "DrunkWalk", "drunk walk", "Funky_Walk", "DrunkWalk", new Vector3(300f, -200f, 0f));
+            AnimatorState excited = AddStatePreferMixamo(sm, "Excited", "Excited", "happy_jump_m", "Excited", new Vector3(600f, -60f, 0f));
+            // Defeat's clip source changed: it now PREFERS Mixamo's own
+            // dedicated "Defeat" download — the first time this state has ever
+            // been a different motion from DrunkIdle. Falls back to the old
+            // Headache_Relief split only if that download is missing.
+            AnimatorState defeat = AddStatePreferMixamo(sm, "Defeat", "Defeat", "Headache_Relief", "Defeat", new Vector3(600f, 40f, 0f));
+            AnimatorState fallFlat = AddStatePreferMixamo(sm, "FallFlat", null, "Fall_Down", "FallFlat", new Vector3(600f, 140f, 0f));
+            AnimatorState throwState = AddStatePreferMixamo(sm, "Throw", null, "Female_Crouch_Pick_Throw_Forward", "Throw", new Vector3(600f, 240f, 0f));
+
+            // SitIdle / Stumble are MIXAMO-ONLY — Meshy shipped neither a
+            // seated pose nor a stumble, so unlike every state above there is
+            // no Meshy clip to fall back to. TryAddMixamoOnlyState returns null
+            // (adds nothing) rather than a state bound to nothing when the
+            // download isn't on disk, so a clone without these two files still
+            // builds a valid controller. Neither has a transition into it yet
+            // — that's Block 4's job (Docs/Prompts/2026-08-11-executive-day-
+            // plan.md), once a Seat component and a ControlMode.Seated hook
+            // exist to actually drive them. They're built now purely so the
+            // clip and the state exist and are ready to be wired up then.
+            AnimatorState sitIdle = TryAddMixamoOnlyState(sm, "SitIdle", "Sitting Idle", new Vector3(900f, -160f, 0f));
+            AnimatorState stumble = TryAddMixamoOnlyState(sm, "Stumble", "Stumble Backwards", new Vector3(900f, -60f, 0f));
+            // StandToSit/SitToStand landed 2026-08-12 — Tony's second Mixamo
+            // batch included BOTH transition directions ("Stand To Sit(1)",
+            // "Sit To Stand(1)"), closing the gap the 2026-08-11 session left
+            // open (Meshy had a seated idle to point SitIdle at but no
+            // transition clip at all). SitToStand isn't one of the states the
+            // day plan named, but it's the natural complement to StandToSit
+            // and the clip was already sitting there unused, so it's wired up
+            // too rather than left on the shelf. Still no transitions INTO
+            // any of these four — that's still Block 4's job, once a Seat
+            // component and ControlMode.Seated exist to actually drive them.
+            AnimatorState standToSit = TryAddMixamoOnlyState(sm, "StandToSit", "Stand To Sit(1)", new Vector3(900f, -260f, 0f));
+            AnimatorState sitToStand = TryAddMixamoOnlyState(sm, "SitToStand", "Sit To Stand(1)", new Vector3(900f, -360f, 0f));
+
+            if (sitIdle == null)
+                Debug.LogWarning($"[CharacterSetup] SitIdle skipped — no '{MixamoClipPath("Sitting Idle")}' found.");
+            if (stumble == null)
+                Debug.LogWarning($"[CharacterSetup] Stumble skipped — no '{MixamoClipPath("Stumble Backwards")}' found.");
+            if (standToSit == null)
+                Debug.LogWarning($"[CharacterSetup] StandToSit skipped — no '{MixamoClipPath("Stand To Sit(1)")}' found.");
+            if (sitToStand == null)
+                Debug.LogWarning($"[CharacterSetup] SitToStand skipped — no '{MixamoClipPath("Sit To Stand(1)")}' found.");
 
             sm.defaultState = idle;
 
@@ -782,9 +839,11 @@ namespace WeeSpurts.Editor
             Debug.Log($"[CharacterSetup] Done — mascot is now a HUMANOID rig. Model: {CharacterModelPath}\n" +
                       $"Controller: {ControllerPath}\nPrefab: {PlayerCharacterPrefabPath}\n" +
                       "Now run WeeSpurts -> 2 Build New Scene -> Bowling Greybox to put it in the alley.\n" +
-                      "STILL OUTSTANDING: DrunkIdle and Defeat remain the same Headache_Relief motion, and " +
-                      "SitIdle/StandToSit/Stumble do not exist yet — all three need the Mixamo clips (see the " +
-                      "Clips table comment).");
+                      (sitIdle != null && stumble != null && standToSit != null && sitToStand != null
+                          ? "DrunkIdle/Defeat are now DIFFERENT Mixamo clips, and SitIdle/Stumble/StandToSit/SitToStand all exist (unwired — Block 4's job). "
+                          : "DrunkIdle/Defeat are now different Mixamo clips. STILL OUTSTANDING: see the SitIdle/Stumble/StandToSit/SitToStand warnings above, if any. ") +
+                      "STILL OUTSTANDING regardless: Sprint/FallFlat/Throw have no Mixamo replacement in " +
+                      "today's batch so they're still on their original Meshy clips.");
         }
 
         /// <summary>
@@ -998,6 +1057,30 @@ namespace WeeSpurts.Editor
                 // reason as the Meshy loop above: defaultClipAnimations reports
                 // what the last COMPLETED import found, not what is pending.
                 importer.SaveAndReimport();
+
+                // BELT AND BRACES against a fresh-file race (found live,
+                // 2026-08-11): on a big batch of just-moved-in FBXs,
+                // SaveAndReimport can return before Unity's asset worker has
+                // actually finished writing THIS file's animation curves —
+                // observed correlating with the larger "with skin" downloads,
+                // but not exclusively (two small ones hit it too). The symptom
+                // is not "ambiguous take", it's defaultClipAnimations coming
+                // back completely EMPTY — confirmed by the .meta files
+                // themselves ending up ~1 KB smaller than a clip that actually
+                // imported. ForceSynchronousImport blocks until THIS asset's
+                // import is genuinely done before anything below trusts its
+                // output. (Verified against the 6000.5 scripting reference —
+                // the real member is ForceSynchronousImport, not
+                // ForceSynchronous; that wrong guess is what broke the first
+                // attempt at this fix, CS0117, caught by Tony's own compile
+                // before it did anything worse than fail loudly.)
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+                importer = AssetImporter.GetAtPath(path) as ModelImporter;
+                if (importer == null)
+                {
+                    Debug.LogWarning($"[CharacterSetup] {path} lost its importer during the forced reimport — skipping it.");
+                    continue;
+                }
 
                 ModelImporterClipAnimation[] takes =
                     importer.defaultClipAnimations ?? new ModelImporterClipAnimation[0];
@@ -1451,6 +1534,79 @@ namespace WeeSpurts.Editor
 
             state.motion = clip;
             return state;
+        }
+
+        /// <summary>
+        /// Adds a state using the Mixamo download named <paramref name="mixamoFileName"/>
+        /// when it's actually on disk, falling back to the Meshy
+        /// (<paramref name="meshySourceFile"/>, <paramref name="meshyClipName"/>)
+        /// clip otherwise. <paramref name="mixamoFileName"/> may be null for a
+        /// state with no Mixamo replacement at all (Sprint, FallFlat, Throw) —
+        /// that always takes the Meshy branch.
+        ///
+        /// WHY A DISK CHECK AND NOT JUST "DID ImportMixamoClips RUN": missing
+        /// is the NORMAL case on a fresh clone or before Tony has grabbed a
+        /// given clip, exactly like MixamoFolder's own missing-folder handling
+        /// above — this has to degrade to the Meshy clip, not error, so the
+        /// tool stays "safe to run repeatedly" per the class doc even with an
+        /// empty or partial Animations/Mixamo/ folder.
+        /// </summary>
+        private static AnimatorState AddStatePreferMixamo(
+            AnimatorStateMachine sm, string stateName,
+            string mixamoFileName, string meshySourceFile, string meshyClipName,
+            Vector3 position)
+        {
+            if (mixamoFileName != null && MixamoClipExists(mixamoFileName))
+                return AddState(sm, stateName, MixamoClipPath(mixamoFileName), mixamoFileName, position);
+
+            return AddState(sm, stateName, MascotClipPath(meshySourceFile), meshyClipName, position);
+        }
+
+        /// <summary>
+        /// Adds a state from a Mixamo download with NO Meshy fallback (SitIdle,
+        /// Stumble) — returns null instead of building a state bound to
+        /// nothing when the file isn't usable. Deliberately not folded into
+        /// <see cref="AddStatePreferMixamo"/>: that method always returns a
+        /// state (it has a fallback to fall back TO), this one legitimately
+        /// might not, and callers need to tell the two apart.
+        /// </summary>
+        private static AnimatorState TryAddMixamoOnlyState(AnimatorStateMachine sm, string stateName, string mixamoFileName, Vector3 position)
+        {
+            if (!MixamoClipExists(mixamoFileName)) return null;
+            return AddState(sm, stateName, MixamoClipPath(mixamoFileName), mixamoFileName, position);
+        }
+
+        /// <summary>
+        /// True only when the Mixamo FBX exists AND actually produced a usable,
+        /// named AnimationClip — NOT merely when the file is on disk.
+        ///
+        /// FOUND LIVE, 2026-08-11: some of Tony's "With Skin" Mixamo downloads
+        /// import cleanly as a MODEL (so AssetDatabase.LoadAssetAtPath&lt;GameObject&gt;
+        /// happily returns one) while contributing ZERO AnimationClip
+        /// sub-assets — ImportMixamoClips' own SelectTakeIndex reports "Takes
+        /// found: " completely empty for them, reproducibly, even after a
+        /// forced ImportAssetOptions.ForceSynchronousImport reimport from a
+        /// cold Editor with no other Unity instance running. Not a timing
+        /// race — confirmed by content inspection (the raw FBX bytes plainly
+        /// contain "mixamo.com" and AnimStack data) that Unity's importer
+        /// still doesn't surface as a clip for these specific files, for
+        /// reasons this tool cannot fix from the outside. The "Without Skin"
+        /// downloads in the SAME batch import perfectly.
+        ///
+        /// A file-existence check alone would have committed the state to a
+        /// clip path that resolves to nothing — exactly the failure mode
+        /// AddState's own "state will be empty" warning exists to catch, but
+        /// silently worse here: it would have thrown away a known-working
+        /// Meshy fallback for no benefit. Checking the actual clip is what
+        /// makes AddStatePreferMixamo's fallback real instead of theoretical.
+        /// </summary>
+        private static bool MixamoClipExists(string fileName)
+        {
+            string path = MixamoClipPath(fileName);
+            return AssetDatabase
+                .LoadAllAssetsAtPath(path)
+                .OfType<AnimationClip>()
+                .Any(c => c.name == fileName);
         }
 
         private static void AddTransition(AnimatorState from, AnimatorState to, AnimatorConditionMode mode, float threshold, string parameter)

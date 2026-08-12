@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb17f237a157b4fcf91164a3a0f160b8, type: 3}
   m_Name: BallConfig
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.BallConfig
-  Mass: 6
-  Radius: 0.11
+  Mass: 7.26
+  Radius: 0.108
   MinLaunchSpeed: 4
   MaxLaunchSpeed: 14
   SpinCurveForce: 6
@@ -21,8 +21,8 @@ MonoBehaviour:
   RollSkidHookScale: 0.6
   SpinDriveForce: 3
   SpawnHeight: 0.13
-  Bounciness: 0.25
-  RollingDrag: 0.12
+  Bounciness: 0.3
+  RollingDrag: 0.06
   ThrowTimeout: 9
   SettleSpeed: 0.25
   SettleDuration: 0.75

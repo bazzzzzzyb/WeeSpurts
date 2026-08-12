@@ -20,12 +20,17 @@ namespace WeeSpurts.Editor
     /// guaranteed to stick, and it is the same pattern GreyboxSceneBuilder and
     /// RoamingSetupTool already use.
     ///
-    /// THIS ONLY TOUCHES NUMBERS THAT WERE WRONG, not numbers that were merely
-    /// to taste. Speeds, green zones, timing-chaos curves, the Nuke's staging
-    /// and Wobbler's weave are all FEEL, they belong to Tony, and they are left
-    /// alone. What gets corrected is values that are internally inconsistent —
-    /// a ball wider than the lane, a "cannonball" that weighs a third more than
-    /// a normal ball, pins bouncier than the ball that hits them.
+    /// SCOPE: the standard ball (BallConfig) and the pins (PinConfig) are
+    /// tuned toward REAL bowling physics as of the 2026-08-12 pass — mass,
+    /// dimensions, restitution and friction now target actual USBC
+    /// regulation numbers, on Tony's explicit direction, superseding the
+    /// 2026-07-26 "realistic ratios read as limp" call recorded in those two
+    /// Tweak blocks' comments. The powerup balls (BouncyBall, Cannonball,
+    /// Wobbler, Nuke) are DELIBERATELY NOT realistic — a superball, a lump of
+    /// iron and a snake-curving ball are jokes by design — and are left as
+    /// pure feel, untouched by this pass. Speeds, green zones, timing-chaos
+    /// curves, the Nuke's staging and Wobbler's weave stay FEEL everywhere,
+    /// realism pass or not, and are left alone.
     ///
     /// SAFE TO RE-RUN, and safe to ignore: it is a one-shot corrective, not
     /// something any other system depends on.
@@ -60,16 +65,35 @@ namespace WeeSpurts.Editor
                            "timing curves, Nuke staging, Wobbler weave) were NOT touched.\n");
 
             // ---------------- the default ball ----------------
-            // Reference: a real ten-pin ball is 6.4-7.3kg at 0.1085m radius.
-            // Mass 6 is a 13lb ball, which is a legitimate choice and is left
-            // alone. Only the radius was broken.
+            // REALISM PASS (2026-08-12, Tony's explicit call, overriding the
+            // 2026-07-26 "Cannonball ratio feels better" decision below on the
+            // pins — see PinConfig's own Tweak block for the other half of
+            // this). Reference: USBC regulation — ball diameter 8.500-8.595in
+            // (radius ~0.108-0.109m), max weight 16lb (7.26kg). "Real bowling
+            // balls are ~7" was already this file's own field tooltip; this
+            // pass just actually gets there instead of sitting at a 13lb ball.
             Apply("BallConfig", log, new[]
             {
-                new Tweak("Radius", 0.11f,
-                    "was 1 — a 2m-wide ball. Made HalfLaneWidth negative (0.7 - 1 = -0.3), which " +
-                    "INVERTED left/right for the thrower, the aim preview and the resolved throw, " +
-                    "and also wrecked the roll: Launch sets angularVelocity = speed/Radius, so at " +
-                    "Radius 1 the ball span at 14 rad/s instead of 127 and skidded down the lane"),
+                new Tweak("Radius", 0.108f,
+                    "was 0.11 — close, but 0.108 is the exact regulation radius (8.5in diameter / 2), " +
+                    "and Launch's angularVelocity = speed/Radius makes this worth getting precise"),
+                new Tweak("Mass", 7.26f,
+                    "was 6 (13lb) — a deliberate lighter-than-real choice from 2026-07-26 (see PinConfig's " +
+                    "own note on why realistic ratios 'read as limp'). Tony's overriding that today: 7.26kg " +
+                    "is the actual USBC max regulation weight (16lb), and the field tooltip already claimed " +
+                    "this number — it just wasn't applied. Pins are getting realistically heavier alongside " +
+                    "this (see PinConfig), so the RATIO changes together rather than the ball alone getting " +
+                    "heavier against unchanged light pins, which is exactly the 'read as limp' failure mode"),
+                new Tweak("Bounciness", 0.3f,
+                    "was 0.25, briefly 0.5. 0.5 shipped once, live, and — because bounceCombine=Maximum " +
+                    "means THIS value wins every ball-pin contact regardless of what PinConfig says — it " +
+                    "made collisions bounce the ball rather than shove the pin, which combined with the " +
+                    "pin-side changes to produce pins that wobble and right themselves instead of falling " +
+                    "('mighty beans,' caught live in Play). 0.3 favours transferring the hit into the pin"),
+                new Tweak("RollingDrag", 0.06f,
+                    "was 0.12. Regulation lanes are oiled/waxed specifically to be low-friction — a real " +
+                    "ball loses only a modest fraction of its speed over 60 feet. Halving the drag keeps " +
+                    "more of the ball's momentum through to the pins, closer to a real lane's slickness"),
             });
 
             // ---------------- BouncyBall ----------------
@@ -118,38 +142,60 @@ namespace WeeSpurts.Editor
                            "participates. Blast values left as tuned.\n");
 
             // ---------------- pins ----------------
-            // Reference: a real ten-pin is 1.53kg, 0.381m tall, and made of
-            // maple with a plastic coat — heavy-ish and quite dead.
+            // REALISM PASS (2026-08-12, Tony's explicit call, overriding the
+            // 2026-07-26 tweaks directly below this comment, which were an
+            // intentional departure from real bowling because the realistic
+            // ratio "read as limp" at the time. That call is superseded, not
+            // deleted — the old Tweak entries stay in the log/history as the
+            // record of what was true then. Reference: USBC regulation — pin
+            // height 15in (0.381m, already correct), weight 3lb 6oz-3lb 10oz
+            // (1.531-1.644kg, centre ~1.588kg), and centre-of-gravity spec'd
+            // between roughly 5.99-6.25in from the base of a 15in pin (a
+            // 0.40-0.417 fraction of height). Ball went back to a real 7.26kg
+            // in the same pass (see BallConfig above) — the mass RATIO is
+            // what actually reads as real, so both sides move together.
+            // CORRECTION, same session: the block above shipped once, live, and
+            // produced pins that wobble and RIGHT THEMSELVES instead of falling
+            // ("mighty beans" — Tony, watching it in Play). That's the textbook
+            // signature of a body that's too stable to topple: a wider base
+            // extends the tilt angle before its centre of mass crosses the edge
+            // of support and gravity takes over, a heavier pin needs more
+            // momentum to get there in the first place, and a more elastic
+            // collision (bounceCombine=Maximum, so the BALL's bounciness wins
+            // every contact) puts more of the hit into rebound and less into
+            // actually shoving the pin past that point. All three numbers above
+            // pushed the same direction at once. This pass pulls them back —
+            // not all the way to the pre-realism values, but past the point
+            // where pins reliably go down instead of settling for "physically
+            // closer to real" over "is a bowling game."
             ApplyPins(log, new[]
             {
-                new Tweak("PinMass", 0.9f,
-                    "a real pin is 1.53kg, which against a 6kg ball is a 4:1 ratio — REAL bowling, " +
-                    "and it is the thing that felt wrong. Tony's read: Cannonball (20kg, a 17:1 " +
-                    "ratio) is the one that feels right. Rather than make every ball a cannonball, " +
-                    "lighten the PIN — which is also what this config's own design note has said all " +
-                    "along ('lighter pins fly further = funnier'). 0.9 against 6kg is ~7:1, most of " +
-                    "the way to Cannonball's punch while keeping enough mass to carry into neighbours"),
-                new Tweak("Friction", 0.25f,
-                    "was 0.494. THIS IS PROBABLY THE 'SLAMMING INTO THE GROUND' CULPRIT: a pin that " +
-                    "lands on a high-friction lane grips and stops dead the instant it touches. Real " +
-                    "lanes are OILED and slick, which is why real pins slide, spin and skitter away " +
-                    "after they fall. Dropping friction lets them keep travelling instead of " +
-                    "arriving and sticking"),
-                new Tweak("Bounciness", 0.35f,
-                    "was 0.463, briefly 0.25. 0.25 was too dead now that pins are meant to skitter — " +
-                    "0.35 lets them hop off the lane and each other without the rubber-ball trampoline " +
-                    "that 0.463 gave"),
-                new Tweak("CenterOfMassHeight01", 0.38f,
-                    "bottom-heavy, like a real pin: it wobbles, sometimes rights itself, and topples " +
-                    "about its base rather than pivoting around its middle. NOTE this knob was " +
-                    "BROKEN until now — centerOfMass is in local space and the pin transform is " +
-                    "scaled 0.19 on Y, so the value was being shrunk to about a fifth of what it " +
-                    "said and moving it did almost nothing. Now honest. 0.5 = uniform = old behaviour"),
-                new Tweak("BaseDiameter01", 0.45f,
-                    "NEW FIELD. Width of the flat pad the pin stands on, as a fraction of pin width, " +
-                    "now that the collider is a capsule on a base pad rather than one full-size box. " +
-                    "Narrow base = tips readily, like the real thing. Below ~0.3 pins start falling " +
-                    "over on their own"),
+                new Tweak("PinMass", 1.1f,
+                    "was 1.59 (USBC's literal spec, and the direct cause of pins resisting the hit — " +
+                    "more mass needs more momentum to accelerate past its tipping point). 1.1kg against " +
+                    "the ball's 7.26kg is a 6.6:1 ratio, close to the 6.67:1 (6kg/0.9kg) this project " +
+                    "already knew worked, just carried by a heavier, more realistic ball instead of a " +
+                    "light one — realism where it does not fight the knockdown, not everywhere"),
+                new Tweak("Bounciness", 0.3f,
+                    "was 0.6, and combined with the ball's own 0.5 (bounceCombine=Maximum picks the " +
+                    "larger every time) that was a genuinely bouncy collision — energy spent rebounding " +
+                    "the ball is energy NOT spent shoving the pin over. 0.3 favours transferring the hit " +
+                    "into the pin rather than into an elastic bounce"),
+                new Tweak("BaseDiameter01", 0.32f,
+                    "was 0.55 — THE main culprit. A wider base means the pin can lean further before its " +
+                    "centre of mass passes the edge of its own footprint and gravity finishes the topple; " +
+                    "0.55 was wide enough that a solid hit could wobble it right back upright, the exact " +
+                    "'mighty bean' effect. 0.32 sits just above this file's own documented self-toppling " +
+                    "floor (~0.3) — narrow enough that a real hit reliably carries through"),
+                new Tweak("CenterOfMassHeight01", 0.45f,
+                    "was 0.4 (and 0.38 before that) — moving further from bottom-heavy, on purpose this " +
+                    "time. Bottom-heavy is exactly what gives a weeble/mighty-bean toy its self-righting " +
+                    "torque; less of it means less of that effect fighting a knockdown, while 0.45 is " +
+                    "still on the bottom-heavy side of uniform (0.5), not neutral"),
+                new Tweak("Friction", 0.3f,
+                    "unchanged from the previous pass — not implicated in the self-righting symptom, " +
+                    "still a reasonable middle value versus the 0.494 that made pins stick dead on " +
+                    "landing before any of this"),
             });
 
             AssetDatabase.SaveAssets();
