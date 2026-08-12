@@ -12884,6 +12884,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Bowling.BowlingBall
   lane: {fileID: 406773373}
+  gutterHalfWidth: 0.7
 --- !u!4 &297465266
 Transform:
   m_ObjectHideFlags: 0
@@ -33248,6 +33249,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e256e16f2a92340399c7a4c8739298c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Core.AudioManager
+  catalog: {fileID: 11400000, guid: 497fd692969360943af688a89dabcea2, type: 2}
+  poolSize: 12
 --- !u!82 &691867706
 AudioSource:
   m_ObjectHideFlags: 0

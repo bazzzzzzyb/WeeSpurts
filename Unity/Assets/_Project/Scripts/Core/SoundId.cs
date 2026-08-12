@@ -17,11 +17,15 @@ namespace WeeSpurts.Core
         public const string SlotJackpot = "slot_jackpot";
         public const string UiClick = "ui_click";
         public const string AmbienceAlley = "ambience_alley";
+        public const string MatchStart = "match_start";
+        public const string CardDeal = "card_deal";
+        public const string SlotLeverPull = "slot_lever_pull";
 
         public static readonly string[] All =
         {
             BallRoll, BallLaneImpact, BallGutter, PinCrash, TicketDispense,
-            SlotReelStop, SlotJackpot, UiClick, AmbienceAlley
+            SlotReelStop, SlotJackpot, UiClick, AmbienceAlley,
+            MatchStart, CardDeal, SlotLeverPull
         };
     }
 }

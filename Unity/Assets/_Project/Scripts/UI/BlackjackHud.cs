@@ -280,6 +280,7 @@ namespace WeeSpurts.UI
             foreach (GameObject card in cards)
             {
                 if (card != null) StartCoroutine(ScaleIn(card.transform));
+                AudioManager.Instance?.PlaySfx(SoundId.CardDeal);
                 yield return new WaitForSeconds(dealStagger);
             }
             view.RevealRoutine = null;

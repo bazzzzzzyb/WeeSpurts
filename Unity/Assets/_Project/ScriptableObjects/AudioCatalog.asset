@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 89a846118aea2cf4ebc47556629aef70, type: 3}
+  m_Name: AudioCatalog
+  m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Core.AudioCatalog
+  sounds:
+  - Id: ball_roll
+    Clips: []
+    Volume: 1
+  - Id: ball_lane_impact
+    Clips: []
+    Volume: 1
+  - Id: ball_gutter
+    Clips:
+    - {fileID: 8300000, guid: be8887bda3901a04a8619773d39d9695, type: 3}
+    Volume: 1
+  - Id: pin_crash
+    Clips: []
+    Volume: 1
+  - Id: ticket_dispense
+    Clips: []
+    Volume: 1
+  - Id: slot_reel_stop
+    Clips:
+    - {fileID: 8300000, guid: 02d8eeab5b5f6a0488429d2b28df9aac, type: 3}
+    Volume: 1
+  - Id: slot_jackpot
+    Clips: []
+    Volume: 1
+  - Id: ui_click
+    Clips:
+    - {fileID: 8300000, guid: de810cca383d4fa4f9ca928e21eff4f0, type: 3}
+    Volume: 1
+  - Id: ambience_alley
+    Clips:
+    - {fileID: 8300000, guid: 1de2c4fb63b4a40408a3d9fa31cb72fb, type: 3}
+    Volume: 1
+  - Id: match_start
+    Clips:
+    - {fileID: 8300000, guid: 527cad3f1bf90e74faa36b60f0de66a1, type: 3}
+    Volume: 1
+  - Id: card_deal
+    Clips:
+    - {fileID: 8300000, guid: b235d2ca5c78e324daead6fb8f44dc8d, type: 3}
+    Volume: 1
+  - Id: slot_lever_pull
+    Clips:
+    - {fileID: 8300000, guid: dc227c0996d38f646baf0e23951e4057, type: 3}
+    Volume: 1

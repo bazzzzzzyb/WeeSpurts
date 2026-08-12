@@ -1,4 +1,5 @@
 using UnityEngine;
+using WeeSpurts.Core;
 using WeeSpurts.Interaction;
 using WeeSpurts.Player;
 
@@ -106,6 +107,10 @@ namespace WeeSpurts.Bowling
         {
             if (!CanInteract(player)) return;
             game.StartMatch(player);
+            // Layered on top of PlayerInteractor's generic ui_click (already
+            // played before this call) — this is the "the match is actually
+            // starting" beat, distinct from an ordinary button press.
+            AudioManager.Instance?.PlaySfxAt(SoundId.MatchStart, transform.position);
         }
 
         /// <summary>

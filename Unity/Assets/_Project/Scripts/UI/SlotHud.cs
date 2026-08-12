@@ -136,6 +136,7 @@ namespace WeeSpurts.UI
         private void OnPullClicked()
         {
             if (_flickering || station == null) return;
+            AudioManager.Instance?.PlaySfxAt(SoundId.SlotLeverPull, station.transform.position);
             StartCoroutine(PullRoutine());
         }
 
