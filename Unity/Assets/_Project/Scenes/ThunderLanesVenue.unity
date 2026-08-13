@@ -2569,6 +2569,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Core.PositionalAmbience
   soundId: ambience_birthday_room
+  minDistance: 3
+  maxDistance: 15
 --- !u!1 &47893816
 GameObject:
   m_ObjectHideFlags: 0
@@ -74625,6 +74627,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Core.PositionalAmbience
   soundId: music_dj_booth
+  minDistance: 3
+  maxDistance: 15
 --- !u!114 &1637442727
 MonoBehaviour:
   m_ObjectHideFlags: 0

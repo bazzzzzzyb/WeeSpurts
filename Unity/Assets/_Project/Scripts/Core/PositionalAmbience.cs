@@ -8,11 +8,19 @@ namespace WeeSpurts.Core
     /// bed, and neither should go through <see cref="AudioManager.SetAmbience"/>
     /// — that's ONE global slot, already claimed by the bowling alley's own
     /// ambience, and two rooms sharing it would mean whichever set it last
-    /// wins. This is deliberately NOT a general audio-zone system (no falloff
-    /// curves, no trigger volumes, no fade) — it's the same
-    /// AddComponent&lt;AudioSource&gt;-in-Awake, loop=true, spatialBlend=1
-    /// pattern <see cref="Bowling.BowlingBall"/> already uses for its roll
-    /// loop, just reusable instead of copy-pasted a second time.
+    /// wins. Same AddComponent&lt;AudioSource&gt;-in-Awake, loop=true,
+    /// spatialBlend=1 pattern <see cref="Bowling.BowlingBall"/> already uses
+    /// for its roll loop, just reusable instead of copy-pasted a second time.
+    ///
+    /// ROOMS ISOLATE BY DISTANCE (Tony's call): <see cref="minDistance"/>/
+    /// <see cref="maxDistance"/> are set explicitly rather than left at
+    /// Unity's own AudioSource defaults (min 1m, max 500m) — 500m is
+    /// enormous next to a ~30x42m venue, so left alone the DJ booth and the
+    /// birthday room would both be faintly audible almost everywhere,
+    /// exactly the opposite of "each room has its own bed." Linear rolloff,
+    /// not Logarithmic: Logarithmic trails off slowly and unpredictably at
+    /// this scale, where Linear gives a clean, tunable "full volume out to
+    /// minDistance, silent past maxDistance" — the actual shape a room needs.
     ///
     /// SETUP: [SerializeField] soundId, wired by an editor tool same as every
     /// other station field in this project. Plays automatically once
@@ -23,6 +31,12 @@ namespace WeeSpurts.Core
     {
         [Tooltip("Which AudioCatalog row to loop here. Empty means silent.")]
         [SerializeField] private string soundId;
+
+        [Tooltip("Meters. Full volume anywhere inside this radius.")]
+        [SerializeField] private float minDistance = 3f;
+
+        [Tooltip("Meters. Silent at or beyond this radius — this is the actual room-isolation knob. Tune per-instance in the Inspector if one room should carry further/less far than another.")]
+        [SerializeField] private float maxDistance = 15f;
 
         private AudioSource _source;
         private bool _started;
@@ -36,6 +50,9 @@ namespace WeeSpurts.Core
             _source.loop = true;
             _source.playOnAwake = false;
             _source.spatialBlend = 1f;
+            _source.rolloffMode = AudioRolloffMode.Linear;
+            _source.minDistance = minDistance;
+            _source.maxDistance = maxDistance;
         }
 
         private void Update()

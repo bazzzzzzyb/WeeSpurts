@@ -186,8 +186,8 @@ namespace WeeSpurts.Bowling
             _rb.AddExplosionForce(force, origin, radius, upwardsModifier: 0.3f, mode: ForceMode.Impulse);
         }
 
-        /// <summary>Below this relative speed (m/s), a contact is a pins-resettling nudge, not a crash worth hearing.</summary>
-        private const float MinImpactSpeedForSound = 1.5f;
+        /// <summary>Below this speed-equivalent (m/s), a contact is a pins-resettling nudge, not a crash worth hearing.</summary>
+        private const float MinImpactSpeedForSound = 1f;
 
         /// <summary>
         /// Plain UnityEngine.Random for the variation pick, not a seeded RNG:
@@ -195,10 +195,27 @@ namespace WeeSpurts.Bowling
         /// downstream reads which take played, unlike a card or a payout.
         /// Same rule Block 1's SlotMachine/DrinkMeter work applied to
         /// non-throw-driven randomness.
+        ///
+        /// GATE ON IMPULSE, NOT relativeVelocity — this was the actual bug
+        /// behind "no pin strike audio, ever." Collision.relativeVelocity is
+        /// measured pre-resolution and is normally reliable, but for a fast
+        /// ContinuousDynamic sweep (both ball and pin run CCD — see Awake's
+        /// comment) it can read anomalously low or zero, because the CCD
+        /// solver's time-of-impact step can report contact data after most
+        /// of the velocity change has already been absorbed into the same
+        /// solve. Collision.impulse — the actual momentum PhysX applied to
+        /// resolve the hit — doesn't have that failure mode, so
+        /// impulse.magnitude / mass (a velocity-equivalent, Δv = impulse/mass,
+        /// so it stays comparable to the same MinImpactSpeedForSound number)
+        /// is the primary signal, with relativeVelocity kept as a fallback
+        /// for the ordinary discrete-collision case (pin-vs-pin, pin-vs-lane)
+        /// where it was never the problem.
         /// </summary>
         private void OnCollisionEnter(Collision collision)
         {
-            if (collision.relativeVelocity.magnitude < MinImpactSpeedForSound) return;
+            float impulseSpeed = collision.impulse.magnitude / Mathf.Max(0.001f, _rb.mass);
+            float hitStrength = Mathf.Max(collision.relativeVelocity.magnitude, impulseSpeed);
+            if (hitStrength < MinImpactSpeedForSound) return;
             AudioManager.Instance?.PlaySfxAt(SoundId.PinCrash, transform.position);
         }
     }
