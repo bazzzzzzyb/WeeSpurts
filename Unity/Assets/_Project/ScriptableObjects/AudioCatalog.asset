@@ -14,10 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: WeeSpurts.Runtime::WeeSpurts.Core.AudioCatalog
   sounds:
   - Id: ball_roll
-    Clips: []
+    Clips:
+    - {fileID: 8300000, guid: e5c4ca86024283844838e6c3ab4a0026, type: 3}
     Volume: 1
   - Id: ball_lane_impact
-    Clips: []
+    Clips:
+    - {fileID: 8300000, guid: 182303ea05f0dff4183e6294f104e08d, type: 3}
     Volume: 1
   - Id: ball_gutter
     Clips:
@@ -27,14 +29,16 @@ MonoBehaviour:
     Clips: []
     Volume: 1
   - Id: ticket_dispense
-    Clips: []
+    Clips:
+    - {fileID: 8300000, guid: 76a6a668ab382a0478f3e1e9f98f8a25, type: 3}
     Volume: 1
   - Id: slot_reel_stop
     Clips:
     - {fileID: 8300000, guid: 02d8eeab5b5f6a0488429d2b28df9aac, type: 3}
     Volume: 1
   - Id: slot_jackpot
-    Clips: []
+    Clips:
+    - {fileID: 8300000, guid: 8f5b70c9d1c11d34d87835d0099f0726, type: 3}
     Volume: 1
   - Id: ui_click
     Clips:
@@ -70,11 +74,18 @@ MonoBehaviour:
     - {fileID: 8300000, guid: 61e0a83f9c11cb54280501025b3fd24a, type: 3}
     Volume: 1
   - Id: drink_open
-    Clips: []
+    Clips:
+    - {fileID: 8300000, guid: 117c755917065b446b0084fa1257fd4a, type: 3}
     Volume: 1
   - Id: drink_pour
-    Clips: []
+    Clips:
+    - {fileID: 8300000, guid: e3cf16a2a5e078445b2f61883700da82, type: 3}
     Volume: 1
   - Id: drink_glug
-    Clips: []
+    Clips:
+    - {fileID: 8300000, guid: 4435e72b231019a4bb9849419b5bdd1b, type: 3}
+    Volume: 1
+  - Id: slot_spinning
+    Clips:
+    - {fileID: 8300000, guid: 679d0e882c1a5a049a3053bcb5c49470, type: 3}
     Volume: 1

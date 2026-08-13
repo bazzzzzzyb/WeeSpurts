@@ -69,12 +69,18 @@ namespace WeeSpurts.UI
         private bool _wasVisible;
         private bool _flickering;
         private bool _wasInBonus;
+        private AudioSource _spinSource; // dedicated, not pooled — needs to loop for exactly the flicker's duration, same reasoning as BowlingBall's roll loop
 
         private void Awake()
         {
             if (pullButton != null) pullButton.onClick.AddListener(OnPullClicked);
             if (leaveButton != null) leaveButton.onClick.AddListener(() => { AudioManager.Instance?.PlaySfx(SoundId.UiClick); station.Leave(); });
             if (betSlider != null) betSlider.onValueChanged.AddListener(OnBetSliderChanged);
+
+            _spinSource = gameObject.AddComponent<AudioSource>();
+            _spinSource.loop = true;
+            _spinSource.playOnAwake = false;
+            _spinSource.spatialBlend = 1f;
         }
 
         private void Update()
@@ -146,6 +152,13 @@ namespace WeeSpurts.UI
             if (pullButton != null) pullButton.interactable = false;
             if (resultText != null) resultText.text = "";
 
+            AudioClip spinClip = AudioManager.Instance != null ? AudioManager.Instance.GetClip(SoundId.SlotSpinning) : null;
+            if (spinClip != null)
+            {
+                _spinSource.clip = spinClip;
+                _spinSource.Play();
+            }
+
             float elapsed = 0f;
             while (elapsed < flickerDuration)
             {
@@ -156,6 +169,7 @@ namespace WeeSpurts.UI
                 elapsed += flickerStep;
             }
 
+            _spinSource.Stop();
             SlotPull pull = station.Pull();
             SetReelSymbol(0, pull.Reel0);
             SetReelSymbol(1, pull.Reel1);

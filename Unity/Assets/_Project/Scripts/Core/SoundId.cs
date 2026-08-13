@@ -26,6 +26,7 @@ namespace WeeSpurts.Core
         public const string DrinkOpen = "drink_open";
         public const string DrinkPour = "drink_pour";
         public const string DrinkGlug = "drink_glug";
+        public const string SlotSpinning = "slot_spinning";
 
         public static readonly string[] All =
         {
@@ -33,7 +34,7 @@ namespace WeeSpurts.Core
             SlotReelStop, SlotJackpot, UiClick, AmbienceAlley,
             MatchStart, CardDeal, SlotLeverPull,
             AmbienceBirthdayRoom, MusicDjBooth, FootstepWood,
-            DrinkOpen, DrinkPour, DrinkGlug
+            DrinkOpen, DrinkPour, DrinkGlug, SlotSpinning
         };
     }
 }
