@@ -26,7 +26,10 @@ MonoBehaviour:
     - {fileID: 8300000, guid: be8887bda3901a04a8619773d39d9695, type: 3}
     Volume: 1
   - Id: pin_crash
-    Clips: []
+    Clips:
+    - {fileID: 8300000, guid: b0c85c8ae06ed0346b3f9018f3446399, type: 3}
+    - {fileID: 8300000, guid: b0c85c8ae06ed0346b3f9018f3446399, type: 3}
+    - {fileID: 8300000, guid: b0c85c8ae06ed0346b3f9018f3446399, type: 3}
     Volume: 1
   - Id: ticket_dispense
     Clips:
