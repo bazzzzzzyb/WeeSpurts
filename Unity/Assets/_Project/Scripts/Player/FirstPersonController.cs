@@ -1,5 +1,6 @@
 using UnityEngine;
 using WeeSpurts.Bowling;
+using WeeSpurts.Core;
 
 namespace WeeSpurts.Player
 {
@@ -71,6 +72,12 @@ namespace WeeSpurts.Player
         private float _animatorSpeed;
         private float _animatorSpeedVelocity;
 
+        // Distance accumulator for footsteps — see Move()'s tail. Wood-only
+        // for now (WalkingWoodFloor is the only floor material with a clip),
+        // so this fires the same sound whatever surface the venue's floor
+        // actually is. A real floor-material system is future work.
+        private float _distanceSinceLastStep;
+
         private void Awake()
         {
             _controller = GetComponent<CharacterController>();
@@ -85,6 +92,7 @@ namespace WeeSpurts.Player
             // _slideVelocity.)
             _verticalVelocity = 0f;
             _animatorSpeedVelocity = 0f;
+            _distanceSinceLastStep = 0f;
 
             // Level the view. We could try to preserve the old pitch, but the
             // avatar may have been rotated by MoveToThrowingStance in between,
@@ -196,6 +204,35 @@ namespace WeeSpurts.Player
             // Move() takes a DISPLACEMENT (meters this frame), not a velocity,
             // hence the deltaTime here — unlike the mouse deltas above.
             _controller.Move(velocity * Time.deltaTime);
+
+            StepFootsteps();
+        }
+
+        /// <summary>
+        /// Distance-triggered, not time-triggered — see
+        /// <see cref="RoamConfig.FootstepStrideDistance"/>'s tooltip for why:
+        /// sprinting covers a stride in less time automatically, without a
+        /// second speed-aware formula to keep in sync with WalkSpeed/
+        /// SprintMultiplier. Reads CharacterController.velocity (what was
+        /// ACTUALLY achieved, same source DriveWalkAnimation already trusts),
+        /// not the input vector, so walking into a wall correctly goes quiet
+        /// instead of stepping in place.
+        /// </summary>
+        private void StepFootsteps()
+        {
+            if (!_controller.isGrounded) return;
+
+            Vector3 planar = _controller.velocity;
+            planar.y = 0f;
+            float speed = planar.magnitude;
+
+            if (speed < config.MinFootstepSpeed) { _distanceSinceLastStep = 0f; return; }
+
+            _distanceSinceLastStep += speed * Time.deltaTime;
+            if (_distanceSinceLastStep < config.FootstepStrideDistance) return;
+
+            _distanceSinceLastStep = 0f;
+            AudioManager.Instance?.PlaySfxAt(SoundId.FootstepWood, transform.position);
         }
 
         /// <summary>

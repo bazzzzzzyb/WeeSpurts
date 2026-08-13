@@ -144,6 +144,12 @@ namespace WeeSpurts.Editor
             // ----- 5. The slot machines -----
             string slotReport = BuildSlotStations();
 
+            // ----- 5b. The DJ booth (music only — no paid interaction yet, see DJBoothStation's class comment) -----
+            string djBoothReport = BuildDJBoothStation();
+
+            // ----- 5c. Birthday room ambience -----
+            string birthdayRoomReport = BuildBirthdayRoomAmbience();
+
             // ----- 6. Flush + report -----
             AssetDatabase.SaveAssets();
             EditorSceneManager.MarkSceneDirty(scene);
@@ -157,7 +163,9 @@ namespace WeeSpurts.Editor
                 $"EVENT SYSTEM: {eventSystemReport}\n" +
                 $"BAR: {barReport}\n" +
                 $"BLACKJACK: {blackjackReport}\n" +
-                $"SLOTS: {slotReport}\n\n" +
+                $"SLOTS: {slotReport}\n" +
+                $"DJ BOOTH: {djBoothReport}\n" +
+                $"BIRTHDAY ROOM: {birthdayRoomReport}\n\n" +
                 "NOW TEST: press Play. Walk to the bar and press [E] — your ticket count (top-right) should " +
                 "drop by the drink's price. Walk to the blackjack table and press [E] — you'll sit down with " +
                 "a real bet slider and Deal button (click/drag with the mouse — Hit/Stand/Double/Split are " +
@@ -547,6 +555,80 @@ namespace WeeSpurts.Editor
             foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
                 if (t.name == name) result.Add(t.gameObject);
             return result.ToArray();
+        }
+
+        // ---------- the DJ booth ----------
+
+        /// <summary>
+        /// Anchors a <see cref="DJBoothStation"/> on the existing
+        /// 'DJ_Booth_and_Stage' art object — bounds centre only, no floor-
+        /// height measurement needed (unlike the bar/blackjack seats, nothing
+        /// here needs to be player-eye-height precise, it's just where the
+        /// music plays from). No paid interaction yet — see
+        /// <see cref="DJBoothStation"/>'s own class comment for why that's
+        /// deliberate, not missing.
+        /// </summary>
+        private static string BuildDJBoothStation()
+        {
+            GameObject boothArt = GameObject.Find("DJ_Booth_and_Stage");
+            if (boothArt == null)
+                return "SKIPPED — no 'DJ_Booth_and_Stage' object found in the scene.";
+
+            if (!TryGetWorldBounds(boothArt, out Bounds boothBounds))
+                return "SKIPPED — 'DJ_Booth_and_Stage' has no Renderer anywhere under it to measure.";
+
+            GameObject stationGo = GameObject.Find("Station_DJBooth");
+            bool stationIsNew = stationGo == null;
+            if (stationIsNew)
+            {
+                stationGo = new GameObject("Station_DJBooth");
+                stationGo.transform.position = boothBounds.center;
+                TryParentUnderZone(stationGo, "EastWing_Zones");
+            }
+
+            GetOrAdd<DJBoothStation>(stationGo);
+            // SetSoundId directly, not via the Wire() helper — soundId is a
+            // plain string field, and Wire()'s SerializedProperty.objectReferenceValue
+            // only applies to Unity Object references.
+            PositionalAmbience ambience = GetOrAdd<PositionalAmbience>(stationGo);
+            ambience.SetSoundId(SoundId.MusicDjBooth);
+            EditorUtility.SetDirty(ambience);
+
+            return $"'{stationGo.name}' {(stationIsNew ? $"created at {boothBounds.center}" : "reused (position left as you set it)")}, " +
+                   $"looping '{SoundId.MusicDjBooth}' (silent until a clip is assigned). Not interactable yet — " +
+                   "the paid horn/track-change mechanic needs a horn clip and a price, neither of which exist.";
+        }
+
+        // ---------- the birthday / party room ----------
+
+        /// <summary>
+        /// A bare ambience marker (no VenueStation — nothing to interact
+        /// with, it's just a room) at 'Party_Room_and_Cap's bounds centre.
+        /// </summary>
+        private static string BuildBirthdayRoomAmbience()
+        {
+            GameObject roomArt = GameObject.Find("Party_Room_and_Cap");
+            if (roomArt == null)
+                return "SKIPPED — no 'Party_Room_and_Cap' object found in the scene.";
+
+            if (!TryGetWorldBounds(roomArt, out Bounds roomBounds))
+                return "SKIPPED — 'Party_Room_and_Cap' has no Renderer anywhere under it to measure.";
+
+            GameObject markerGo = GameObject.Find("Ambience_PartyRoom");
+            bool markerIsNew = markerGo == null;
+            if (markerIsNew)
+            {
+                markerGo = new GameObject("Ambience_PartyRoom");
+                markerGo.transform.position = roomBounds.center;
+                TryParentUnderZone(markerGo, "EastWing_Zones");
+            }
+
+            PositionalAmbience ambience = GetOrAdd<PositionalAmbience>(markerGo);
+            ambience.SetSoundId(SoundId.AmbienceBirthdayRoom);
+            EditorUtility.SetDirty(ambience);
+
+            return $"'{markerGo.name}' {(markerIsNew ? $"created at {roomBounds.center}" : "reused (position left as you set it)")}, " +
+                   $"looping '{SoundId.AmbienceBirthdayRoom}' (silent until a clip is assigned).";
         }
 
         /// <summary>Same shape as <see cref="BuildBlackjackHud"/> — bet slider, Pull button, three reel slots, bonus banner. See that method's class comment for the idempotency discipline.</summary>

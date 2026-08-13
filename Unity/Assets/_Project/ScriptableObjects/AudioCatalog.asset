@@ -56,3 +56,25 @@ MonoBehaviour:
     Clips:
     - {fileID: 8300000, guid: dc227c0996d38f646baf0e23951e4057, type: 3}
     Volume: 1
+  - Id: ambience_birthday_room
+    Clips:
+    - {fileID: 8300000, guid: 4ac4445b42b0bfe44911238223cfabf8, type: 3}
+    Volume: 1
+  - Id: music_dj_booth
+    Clips:
+    - {fileID: 8300000, guid: 208911c80d9e0744b9c7be32d4b28c14, type: 3}
+    Volume: 1
+  - Id: footstep_wood
+    Clips:
+    - {fileID: 8300000, guid: 2c0d3792c8a5d684aa765b8dd99adaa6, type: 3}
+    - {fileID: 8300000, guid: 61e0a83f9c11cb54280501025b3fd24a, type: 3}
+    Volume: 1
+  - Id: drink_open
+    Clips: []
+    Volume: 1
+  - Id: drink_pour
+    Clips: []
+    Volume: 1
+  - Id: drink_glug
+    Clips: []
+    Volume: 1

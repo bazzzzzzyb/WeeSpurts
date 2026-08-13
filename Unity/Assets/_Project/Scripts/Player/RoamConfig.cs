@@ -64,5 +64,12 @@ namespace WeeSpurts.Player
         [Header("Animation")]
         [Tooltip("Seconds for the Animator's Speed parameter to catch up to your real speed (SmoothDamp). Stops the walk cycle popping on and off when you tap a key. This matters even though YOU can't see your own body in first person — OTHER players see this model walking.")]
         public float AnimatorSpeedDampTime = 0.12f;
+
+        [Header("Footsteps")]
+        [Tooltip("Meters travelled between footstep sounds. Distance, not a timer, so sprinting naturally steps faster without a second speed-dependent formula to keep in sync.")]
+        public float FootstepStrideDistance = 2.2f;
+
+        [Tooltip("Meters/second of actual (achieved, not input) planar movement below which footsteps stop — keeps a stationary player pressed against a wall silent instead of stepping in place.")]
+        public float MinFootstepSpeed = 0.3f;
     }
 }

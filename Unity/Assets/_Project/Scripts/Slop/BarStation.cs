@@ -1,4 +1,6 @@
+using System.Collections;
 using UnityEngine;
+using WeeSpurts.Core;
 using WeeSpurts.Gameplay;
 using WeeSpurts.Player;
 
@@ -25,6 +27,10 @@ namespace WeeSpurts.Slop
 
         [Tooltip("Which item [E] buys. -1 (default) means 'the first item in the config's list' — set this only if a particular bar should sell something other than its first row.")]
         [SerializeField] private int primaryItemId = -1;
+
+        [Tooltip("Seconds between the open/pour/glug beats of the drink sequence played on a successful purchase. Tony-tunable feel, not a system.")]
+        [SerializeField] private float openToPourDelay = 0.6f;
+        [SerializeField] private float pourToGlugDelay = 0.8f;
 
         private Vendor _vendor;
 
@@ -63,6 +69,8 @@ namespace WeeSpurts.Slop
         /// Buy it. A refusal (broke, sold out mid-frame) is handled entirely
         /// inside Vendor.Purchase — it fires OnRefused and leaves the world
         /// untouched, so there is nothing for this station to catch or undo.
+        /// A GRANTED purchase plays the open/pour/glug drink sequence — see
+        /// <see cref="PlayDrinkSequence"/>.
         /// </summary>
         public override void Interact(PlayerAvatar player)
         {
@@ -72,7 +80,24 @@ namespace WeeSpurts.Slop
 
             EnsureRegistered(player);
             Vendor vendor = GetVendor();
-            vendor.Purchase(ledger, player.EconomyPlayerId, ResolveItemId(vendor));
+            PurchaseResult result = vendor.Purchase(ledger, player.EconomyPlayerId, ResolveItemId(vendor));
+            if (result.Success) StartCoroutine(PlayDrinkSequence());
+        }
+
+        /// <summary>
+        /// Open, pour, glug — three beats in order, Tony's explicit call over
+        /// a single combined sound. All three ids are silent (never an
+        /// exception) until real clips land in the catalog, same as every
+        /// other sound in this project — this coroutine is correct to run
+        /// today even though nothing plays yet.
+        /// </summary>
+        private IEnumerator PlayDrinkSequence()
+        {
+            AudioManager.Instance?.PlaySfxAt(SoundId.DrinkOpen, transform.position);
+            yield return new WaitForSeconds(openToPourDelay);
+            AudioManager.Instance?.PlaySfxAt(SoundId.DrinkPour, transform.position);
+            yield return new WaitForSeconds(pourToGlugDelay);
+            AudioManager.Instance?.PlaySfxAt(SoundId.DrinkGlug, transform.position);
         }
     }
 }

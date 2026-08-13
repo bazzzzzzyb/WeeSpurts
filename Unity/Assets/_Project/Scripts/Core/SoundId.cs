@@ -20,12 +20,20 @@ namespace WeeSpurts.Core
         public const string MatchStart = "match_start";
         public const string CardDeal = "card_deal";
         public const string SlotLeverPull = "slot_lever_pull";
+        public const string AmbienceBirthdayRoom = "ambience_birthday_room";
+        public const string MusicDjBooth = "music_dj_booth";
+        public const string FootstepWood = "footstep_wood";
+        public const string DrinkOpen = "drink_open";
+        public const string DrinkPour = "drink_pour";
+        public const string DrinkGlug = "drink_glug";
 
         public static readonly string[] All =
         {
             BallRoll, BallLaneImpact, BallGutter, PinCrash, TicketDispense,
             SlotReelStop, SlotJackpot, UiClick, AmbienceAlley,
-            MatchStart, CardDeal, SlotLeverPull
+            MatchStart, CardDeal, SlotLeverPull,
+            AmbienceBirthdayRoom, MusicDjBooth, FootstepWood,
+            DrinkOpen, DrinkPour, DrinkGlug
         };
     }
 }
