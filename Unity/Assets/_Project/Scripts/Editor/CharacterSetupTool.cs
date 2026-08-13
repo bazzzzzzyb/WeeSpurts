@@ -16,8 +16,9 @@ namespace WeeSpurts.Editor
     ///   1. Rig FBX (CharacterModelPath) -> HUMANOID rig, avatar built from the
     ///                          model, optimizeGameObjects OFF, materials per
     ///                          RigShipsItsOwnMaterialAsset.
-    ///   1b. Its look -> a transparent copy of its material, so the thrower is
-    ///                   see-through Wii Sports style (MascotConfig.Opacity).
+    ///   1b. Its look -> an OPAQUE copy of its material. Used to be a
+    ///                   transparent, Wii-Sports-style see-through copy
+    ///                   (MascotConfig.Opacity) — dropped 2026-08-13.
     ///   1c. Reports which human bones Unity's auto-mapper actually resolved,
     ///                   and STOPS if a REQUIRED one is missing — see
     ///                   ReportHumanoidMapping for why this is a hard stop.
@@ -164,11 +165,47 @@ namespace WeeSpurts.Editor
             BaseRigFolder + "/Meshy_AI_Mascot_Base_Rig_biped_texture_0.png";
 
         /// <summary>
-        /// The body the game actually uses. Swap this between
-        /// <see cref="BaseRigModelPath"/>, <see cref="OldMascotModelPath"/>, or
-        /// a Quaternius body and re-run — everything downstream reads it.
+        /// Meshy's goblin rig (added 2026-08-13, replacing the Mascot Base Rig
+        /// as the body). Same shape as <see cref="BaseRigFolder"/> — a
+        /// dedicated T-posed Character_output.fbx plus a loose colour-map PNG
+        /// beside it, so <see cref="RigShipsLooseTextures"/> and
+        /// BuildLooseTextureThrowerMaterial cover it with no new code path,
+        /// only a new source folder. Character_output.fbx (not one of the
+        /// _withSkin animation files) is used as the RIG on purpose — same
+        /// reasoning as the original rejected Meshy_AI_Character candidate
+        /// (the class doc's "T-posed Meshy_AI_Character_output.fbx is the
+        /// body" line): a proper T-pose bind is a better avatar source than a
+        /// mid-stride animation frame. It was rejected back then only for its
+        /// embedded-only texture, which the goblin doesn't repeat — it ships
+        /// texture_0.png loose, same as the Base Rig.
         /// </summary>
-        private const string CharacterModelPath = BaseRigModelPath;
+        private const string GoblinFolder = ProjectRoot + "/Characters/Meshy_AI_goblin_rigged_biped";
+
+        private const string GoblinModelPath =
+            GoblinFolder + "/Meshy_AI_goblin_rigged_biped_Character_output.fbx";
+
+        /// <summary>
+        /// The goblin's colour map. Its _metallic/_roughness siblings are left
+        /// unused on disk for the same reason as <see cref="BaseRigBaseColorPath"/>
+        /// — flat stylised art direction, not PBR (Docs/ArtGuide.md) — and the
+        /// same standing instruction not to delete supplied source art.
+        /// Meshy_AI_goblin_rigged_biped_Animation_Running_withSkin.fbx and
+        /// _Walking_withSkin.fbx are also on disk in this folder but unused by
+        /// this tool: every clip, regardless of body, is still retargeted from
+        /// <see cref="MascotFolder"/> onto whichever rig is CharacterModelPath
+        /// (see the Clips table) — Humanoid retargeting is what makes that
+        /// work across differing skeletons in the first place.
+        /// </summary>
+        private const string GoblinBaseColorPath =
+            GoblinFolder + "/Meshy_AI_goblin_rigged_biped_texture_0.png";
+
+        /// <summary>
+        /// The body the game actually uses. Swap this between
+        /// <see cref="GoblinModelPath"/>, <see cref="BaseRigModelPath"/>,
+        /// <see cref="OldMascotModelPath"/>, or a Quaternius body and re-run —
+        /// everything downstream reads it.
+        /// </summary>
+        private const string CharacterModelPath = GoblinModelPath;
 
         /// <summary>
         /// The previous mascot's rig FBX. No longer the character — but still
@@ -194,7 +231,7 @@ namespace WeeSpurts.Editor
         /// Unity extracts embedded media into a .fbm folder and binds it on
         /// import without help. So None would now be throwing away the only
         /// copy of the texture there is. It gets ImportStandard and the normal
-        /// <see cref="ApplyCharacterTransparency"/> remap path instead, which
+        /// <see cref="FixCharacterMaterials"/> remap path instead, which
         /// is the same path the Quaternius bodies have always used.
         /// </summary>
         private static bool RigShipsItsOwnMaterialAsset =>
@@ -202,11 +239,27 @@ namespace WeeSpurts.Editor
 
         /// <summary>
         /// True when the rig ships its colour map as a loose texture FILE next
-        /// to the FBX (the Mascot Base Rig). Those get a material built from
-        /// that texture — see <see cref="BuildLooseTextureThrowerMaterial"/>.
+        /// to the FBX (the Mascot Base Rig, and now the goblin). Those get a
+        /// material built from that texture — see
+        /// <see cref="BuildLooseTextureThrowerMaterial"/>, which reads
+        /// <see cref="ActiveLooseTextureBaseColorPath"/> to know which of the
+        /// two loose PNGs to bind.
         /// </summary>
         private static bool RigShipsLooseTextures =>
-            CharacterModelPath.StartsWith(BaseRigFolder + "/", System.StringComparison.Ordinal);
+            CharacterModelPath.StartsWith(BaseRigFolder + "/", System.StringComparison.Ordinal) ||
+            CharacterModelPath.StartsWith(GoblinFolder + "/", System.StringComparison.Ordinal);
+
+        /// <summary>
+        /// Which loose colour-map PNG belongs to the CURRENT
+        /// <see cref="CharacterModelPath"/> — only meaningful when
+        /// <see cref="RigShipsLooseTextures"/> is true. Keeps
+        /// BuildLooseTextureThrowerMaterial from hard-coding one body's
+        /// texture the way it did before the goblin existed.
+        /// </summary>
+        private static string ActiveLooseTextureBaseColorPath =>
+            CharacterModelPath.StartsWith(GoblinFolder + "/", System.StringComparison.Ordinal)
+                ? GoblinBaseColorPath
+                : BaseRigBaseColorPath;
 
         /// <summary>
         /// True when THIS TOOL supplies the thrower's material rather than
@@ -467,21 +520,24 @@ namespace WeeSpurts.Editor
                 bodyImporter.SaveAndReimport();
             }
 
-            // ----- 1b. Thrower material: Wii-style see-through -----
+            // ----- 1b. Thrower material: opaque -----
             // BEFORE the Avatar is loaded, because this reimports the character
             // FBX and a reimport invalidates sub-asset references taken earlier.
-            // Quaternius bodies get a transparent copy remapped onto their
-            // embedded material slots (ApplyCharacterTransparency); the mascot
-            // has no embedded material to remap (see materialImportMode = None
-            // above) and gets a transparent copy of Meshy's own material
-            // instead, applied directly to the renderer in step 4 below.
+            // Used to build a see-through Wii-Sports-style material here
+            // (MascotConfig.Opacity) — dropped 2026-08-13, Tony's call: the
+            // player character is fully opaque now, no more alpha blending.
+            // Quaternius bodies get an opaque copy remapped onto their
+            // embedded material slots (FixCharacterMaterials); the mascot has
+            // no embedded material to remap (see materialImportMode = None
+            // above) and gets an opaque copy of Meshy's own material instead,
+            // applied directly to the renderer in step 4 below.
             Material mascotThrowerMaterial = null;
             if (RigShipsItsOwnMaterialAsset)
-                mascotThrowerMaterial = BuildMascotThrowerMaterial(mascotConfig.Opacity);
+                mascotThrowerMaterial = BuildMascotThrowerMaterial();
             else if (RigShipsLooseTextures)
-                mascotThrowerMaterial = BuildLooseTextureThrowerMaterial(mascotConfig.Opacity);
+                mascotThrowerMaterial = BuildLooseTextureThrowerMaterial();
             else
-                ApplyCharacterTransparency(mascotConfig.Opacity);
+                FixCharacterMaterials();
 
             // The Avatar is a sub-asset of the FBX, so it has to be dug out of
             // the model's full asset list by type.
@@ -798,7 +854,7 @@ namespace WeeSpurts.Editor
             // Mascot thrower material, applied directly to every renderer the
             // model has (there's no FBX slot to remap into — see
             // BuildMascotThrowerMaterial). No-op for a Quaternius body, which
-            // already got its transparent look via ApplyCharacterTransparency's
+            // already got its materials fixed up via FixCharacterMaterials'
             // FBX-level remap above.
             if (mascotThrowerMaterial != null)
             {
@@ -1170,9 +1226,9 @@ namespace WeeSpurts.Editor
         }
 
         /// <summary>
-        /// The mascot's thrower material: a transparent COPY of Meshy's own
+        /// The mascot's thrower material: an OPAQUE COPY of Meshy's own
         /// shipped material (MascotMaterialPath) — same "copy it, don't mutate
-        /// the original" shape as ApplyCharacterTransparency's Thrower_*.mat
+        /// the original" shape as FixCharacterMaterials' Thrower_*.mat
         /// convention, just built from a known-good external asset instead of
         /// an FBX's embedded sub-assets, since the mascot's embedded material
         /// isn't used at all (materialImportMode = None on the rig — see
@@ -1186,7 +1242,9 @@ namespace WeeSpurts.Editor
         /// </summary>
         /// <summary>
         /// Builds the thrower's material for a rig that ships LOOSE texture
-        /// files (the Mascot Base Rig) rather than a finished .mat.
+        /// files (the Mascot Base Rig, and now the goblin — see
+        /// <see cref="ActiveLooseTextureBaseColorPath"/> for which one wins)
+        /// rather than a finished .mat.
         ///
         /// This is the fix for the failure that killed the previous body swap.
         /// Meshy's FBXs carry a texture reference Unity's auto-search does not
@@ -1205,12 +1263,13 @@ namespace WeeSpurts.Editor
         /// fails LOUDLY (and returns null, leaving the import's own material in
         /// place) on a non-URP project instead of silently producing magenta.
         /// </summary>
-        private static Material BuildLooseTextureThrowerMaterial(float opacity)
+        private static Material BuildLooseTextureThrowerMaterial()
         {
-            var baseColor = AssetDatabase.LoadAssetAtPath<Texture2D>(BaseRigBaseColorPath);
+            string baseColorPath = ActiveLooseTextureBaseColorPath;
+            var baseColor = AssetDatabase.LoadAssetAtPath<Texture2D>(baseColorPath);
             if (baseColor == null)
             {
-                Debug.LogWarning($"[CharacterSetup] Base colour texture not found at {BaseRigBaseColorPath} — " +
+                Debug.LogWarning($"[CharacterSetup] Base colour texture not found at {baseColorPath} — " +
                                  "the thrower will render untextured. Check the file actually imported.");
                 return null;
             }
@@ -1246,13 +1305,13 @@ namespace WeeSpurts.Editor
             mat.SetTexture("_BaseMap", baseColor);
             if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", baseColor);
 
-            MaterialTransparency.Apply(mat, opacity);
+            MaterialTransparency.ApplyOpaque(mat);
             EditorUtility.SetDirty(mat);
             AssetDatabase.SaveAssets();
             return mat;
         }
 
-        private static Material BuildMascotThrowerMaterial(float opacity)
+        private static Material BuildMascotThrowerMaterial()
         {
             Material source = AssetDatabase.LoadAssetAtPath<Material>(MascotMaterialPath);
             if (source == null)
@@ -1278,36 +1337,40 @@ namespace WeeSpurts.Editor
             else
             {
                 // Re-stamp on every run, same reasoning as
-                // ApplyCharacterTransparency: keeps this in sync if Meshy's
+                // FixCharacterMaterials: keeps this in sync if Meshy's
                 // source material ever changes.
                 copy.CopyPropertiesFromMaterial(source);
             }
 
-            MaterialTransparency.Apply(copy, opacity);
+            MaterialTransparency.ApplyOpaque(copy);
             EditorUtility.SetDirty(copy);
             AssetDatabase.SaveAssets();
             return copy;
         }
 
         /// <summary>
-        /// Makes the thrower see-through (GameBible/ArtGuide: Wii Sports keeps
-        /// the thrower readable but lets you see the lane through them).
+        /// Makes the thrower's embedded materials OPAQUE (GameBible/ArtGuide
+        /// used to call for a Wii-Sports see-through look via MascotConfig.
+        /// Opacity — dropped 2026-08-13, Tony's call, no more alpha blending
+        /// on the player). Still named for what it repairs rather than what it
+        /// forces: this is the ONLY path (Quaternius bodies) where the FBX's
+        /// own embedded materials are used at all, and they still need fixing
+        /// up regardless of transparency — see WHY MATERIAL REMAPPING below.
         ///
         /// WHY MATERIAL REMAPPING AND NOT A MATERIAL SET IN THE SCENE: an FBX's
         /// materials are sub-assets generated by the importer, so anything
         /// hand-assigned in the scene or overridden on the prefab is one
-        /// reimport away from being silently reverted to opaque — and a
-        /// reimport happens on any Rig/Model tab tweak or a fresh clone.
-        /// AssetImporter's external-object map lives in the FBX's .meta file, so
-        /// the redirection IS the import setting. It survives reimports by
+        /// reimport away from being silently reverted — and a reimport happens
+        /// on any Rig/Model tab tweak or a fresh clone. AssetImporter's
+        /// external-object map lives in the FBX's .meta file, so the
+        /// redirection IS the import setting. It survives reimports by
         /// construction, which is the whole requirement.
         ///
-        /// The remap points each of the FBX's built-in material slots at a
-        /// transparent COPY of that material in Materials/, so the original
-        /// colours/textures are preserved and only the blending changes.
+        /// The remap points each of the FBX's built-in material slots at an
+        /// opaque COPY of that material in Materials/, so the original
+        /// colours/textures are preserved.
         ///
-        /// Idempotent, and re-applies alpha on every run so changing
-        /// MascotConfig.Opacity and re-running actually takes effect.
+        /// Idempotent — safe to re-run.
         ///
         /// SELF-REPAIRING BY DESIGN. It drives off the FBX's own material slots
         /// rather than off whatever the remap map currently says, because the
@@ -1315,8 +1378,8 @@ namespace WeeSpurts.Editor
         /// and that entry resolves to null. An earlier version keyed off the map
         /// and treated "any entry present" as done, so a broken or half-finished
         /// remap could never be repaired by re-running — the tool would report
-        /// "no materials to make transparent" and give up, pointing at the wrong
-        /// cause. Now a missing target is simply rebuilt.
+        /// "no materials to fix" and give up, pointing at the wrong cause. Now a
+        /// missing target is simply rebuilt.
         ///
         /// API note (CLAUDE.md rule 3 — these were verified against the docs and
         /// against UnityEditor.dll in this exact Unity version, not recalled):
@@ -1329,7 +1392,7 @@ namespace WeeSpurts.Editor
         /// deliberately NOT touched: the remap map alone redirects the slots,
         /// so there's no reason to also move where materials are stored.
         /// </summary>
-        private static void ApplyCharacterTransparency(float opacity)
+        private static void FixCharacterMaterials()
         {
             if (!(AssetImporter.GetAtPath(CharacterModelPath) is ModelImporter importer)) return;
 
@@ -1364,9 +1427,8 @@ namespace WeeSpurts.Editor
 
             if (slots.Count == 0)
             {
-                Debug.LogWarning($"[CharacterSetup] {CharacterModelPath} exposes no materials to make " +
-                                 "transparent, so the thrower will render opaque. Check the Materials tab " +
-                                 "— Material Creation Mode must not be 'None'.");
+                Debug.LogWarning($"[CharacterSetup] {CharacterModelPath} exposes no materials to fix up. " +
+                                 "Check the Materials tab — Material Creation Mode must not be 'None'.");
                 return;
             }
 
@@ -1399,7 +1461,7 @@ namespace WeeSpurts.Editor
                         // regenerates the embedded material, then re-run.
                         Debug.LogWarning($"[CharacterSetup] Slot '{slot.Key}' was remapped to a material " +
                                          $"that no longer exists. Clearing the remap so the FBX rebuilds it — " +
-                                         "run this menu item once more to make it transparent again.");
+                                         "run this menu item once more to fix it up again.");
                         if (existingKeys.TryGetValue(slot.Key, out var orphaned))
                             importer.RemoveRemap(orphaned);
                         needsReimport = true;
@@ -1407,7 +1469,7 @@ namespace WeeSpurts.Editor
                     }
 
                     // new Material(source) copies the shader and every property,
-                    // so the character keeps its own look and only gains alpha.
+                    // so the character keeps its own look.
                     copy = new Material(source);
                     AssetDatabase.CreateAsset(copy, path);
                     needsReimport = true;
@@ -1421,7 +1483,7 @@ namespace WeeSpurts.Editor
                     copy.CopyPropertiesFromMaterial(source);
                 }
 
-                MaterialTransparency.Apply(copy, opacity);
+                MaterialTransparency.ApplyOpaque(copy);
                 EditorUtility.SetDirty(copy);
 
                 if (source != null && source != copy)
@@ -1434,10 +1496,8 @@ namespace WeeSpurts.Editor
             AssetDatabase.SaveAssets();
             if (needsReimport) importer.SaveAndReimport();
 
-            Debug.Log($"[CharacterSetup] Thrower is {opacity:P0} opaque " +
-                      $"({slots.Count} material slot(s) on {modelName}). " +
-                      "Expect to see the lane through the character — and to see the character " +
-                      "through ITSELF, which is what alpha blending does to a closed mesh.");
+            Debug.Log($"[CharacterSetup] Thrower is fully opaque " +
+                      $"({slots.Count} material slot(s) on {modelName}).");
         }
 
         /// <summary>

@@ -92,5 +92,46 @@ namespace WeeSpurts.Editor
             mat.SetInt("_ZWrite", 0);
             mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
         }
+
+        /// <summary>
+        /// The inverse of <see cref="Apply"/>: forces a material fully Opaque,
+        /// with a real depth write. Added 2026-08-13 when the player character
+        /// dropped the Wii-Sports see-through look — see CharacterSetupTool's
+        /// FixCharacterMaterials, which now calls this instead of Apply. Kept
+        /// in this file rather than inlined so both tools share one "known
+        /// good opaque state" the same way they already shared the
+        /// transparent one. GreyboxSceneBuilder's own placeholder capsule
+        /// still calls Apply directly and is untouched by this.
+        /// </summary>
+        public static void ApplyOpaque(Material mat)
+        {
+            Color c = mat.color;
+            c.a = 1f;
+            mat.color = c;
+            if (mat.HasProperty("_BaseColor"))
+            {
+                Color b = mat.GetColor("_BaseColor");
+                b.a = 1f;
+                mat.SetColor("_BaseColor", b);
+            }
+
+            // ----- URP Lit/Unlit -----
+            mat.SetFloat("_Surface", 0f); // 0 = Opaque
+            mat.SetOverrideTag("RenderType", "Opaque");
+            mat.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.DisableKeyword("_ALPHATEST_ON");
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            mat.DisableKeyword("_ALPHAMODULATE_ON");
+            mat.DisableKeyword("_ALPHABLEND_ON");
+
+            // ----- Built-in Standard -----
+            mat.SetFloat("_Mode", 0f); // 0 = Opaque
+
+            // ----- Shared blend state -----
+            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
+            mat.SetInt("_ZWrite", 1);
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Geometry;
+        }
     }
 }

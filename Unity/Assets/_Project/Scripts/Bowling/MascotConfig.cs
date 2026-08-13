@@ -16,10 +16,6 @@ namespace WeeSpurts.Bowling
     [CreateAssetMenu(fileName = "MascotConfig", menuName = "WeeSpurts/Mascot Config")]
     public class MascotConfig : ScriptableObject
     {
-        [Tooltip("0 (invisible) .. 1 (solid). Wii Sports keeps the thrower clearly readable but lets you see the lane through them, roughly 0.5-0.7.")]
-        [Range(0f, 1f)]
-        public float Opacity = 0.6f;
-
         [Tooltip("Uniform scale applied to the PlayerCharacter prefab root. Change this and re-run WeeSpurts > 1 Assets > Set Up Player Character to resize — the console logs the resulting height each time (target ~1.7-1.8 m for an adult).")]
         public float DisplayScale = 0.56f;
     }
